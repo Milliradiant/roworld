@@ -212,7 +212,7 @@ for _, e in entries do
 	)
 end
 list.Text = string.format(
-	"<b>RoWorld audio check</b> — %d entries, %d failing, preload %.1fs\n\n%s",
+	"<b>Audio check</b> — %d entries, %d failing, preload %.1fs\n\n%s",
 	#entries,
 	fails,
 	preload_s,

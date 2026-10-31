@@ -1,16 +1,17 @@
-# Rofront
+# Terra (fork of RoWorld)
 
-## Publish announcements (Discord)
+A fork of lukechatton/roworld (itself an OpenFront port), for Roblox. See README.md.
 
-User (2026-10-15): "whenever you ship to prod or staging, start sending a message to our company discord ... a
-list/summary of the changes", narrowed the same day: "change publish discord message rule to only send when shipping
-to prod". So: **prod only**; a staging publish is not announced.
-
-- Right after every successful publish / deploy to **prod**, post it with the shared script
-  (`~/.local/bin/snick-announce`, used by every Snick project):
-  `snick-announce --project "RoWorld" --target prod [--version vN] [--ref <commit>] --notes-file notes.md [--extra "Restart: ..."]`
-  (after `tools/publish.sh` succeeds without `--staging`). User (2026-10-25): "publish messages should use
-  "RoWorld" instead of "RoFront"" (the game's current name; posts up to v101 said Rofront).
-- Notes: one "- " line per change, in plain words for the team (what players / visitors notice), not commit messages.
-- The webhook lives in `~/.config/snick/discord_publish_webhook` (chmod 600): never print it, never commit it.
-- A failed post never undoes the publish: retry, or tell the user it wasn't announced.
+- Name and source link: `src/shared/Data/Brand.luau` only. The internal `Airfront` instance names
+  (ReplicatedStorage.Airfront, AirfrontServer, AirfrontClient) are code paths, not branding: leave them.
+- Everything is free: `Purchases.FREE_FOR_ALL` (server), every product id forced to 0
+  (`Data/Products`), no subscription (`Data/Subscription.ID = ""`). Tests that exercise the paid paths
+  set `FREE_FOR_ALL = false` themselves.
+- No outside services: `LobbyHttp.ENABLED = false`, lobbies on MemoryStore.
+- Licence (AGPL v3 + LICENSE additional terms): keep "© OpenFront and Contributors" visible, keep the
+  Help card's credits and Source line, never title it OpenFront.
+- Build: `rojo build release.project.json -o build/Terra.rbxl`. Tests: `lune run tests/<name>.luau`
+  (many sim tests need generated data that isn't in the repo and fail to load; compare against a clean
+  checkout rather than expecting all green).
+- Git: commits are authored as Unproblematical with the GitHub noreply address, with no Claude
+  attribution of any kind.

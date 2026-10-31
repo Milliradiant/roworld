@@ -15,6 +15,7 @@ local Signal = UITheme.core("Signal")
 local IS_ROBLOX = typeof(game) == "Instance"
 local TweenService = if IS_ROBLOX then game:GetService("TweenService") else nil
 local Subscription = UICtx.data("Subscription")
+local Brand = UICtx.data("Brand")
 
 local GeneralButton = W.class(W.Control)
 
@@ -190,7 +191,7 @@ function GeneralButton._build(self)
 	}, card)
 	-- the words
 	text(card, {
-		Text = "ROWORLD",
+		Text = Brand.WORDMARK,
 		FontFace = FONT_B,
 		TextSize = 11,
 		TextColor3 = GOLD_LIGHT,

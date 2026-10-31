@@ -57,9 +57,9 @@ local ServerMain = {}
 ServerMain.server = nil :: any
 --- Messages a client may send per second before the rest is ignored (intents have their own 30/s).
 ServerMain.MAX_MESSAGES_PER_SEC = 90
---- The production experience (Rofront; build/publish.json). Other experiences running this code
---- (Rofront Staging) stay off the services production shares.
-ServerMain.PROD_UNIVERSE = 10768172922
+--- The production experience's universe id (build/publish.json), the only one that uses the lobby
+--- service. -1 = none.
+ServerMain.PROD_UNIVERSE = -1
 --- Team games and parties in production (docs/teams-and-parties.md; always on in Staging and Studio).
 ServerMain.TEAM_GAMES_LIVE = true
 --- SETTING messages per second per client (clients throttle each section to 2/s).
@@ -92,7 +92,7 @@ local function report_once(where: string, err: any)
 	end
 	reported[key] = true
 	reported_n += 1
-	warn(string.format("[RoWorldServer] %s failed: %s", where, text))
+	warn(string.format("[Server] %s failed: %s", where, text))
 end
 
 local function core(name: string): any

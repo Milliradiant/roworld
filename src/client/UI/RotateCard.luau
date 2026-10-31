@@ -5,6 +5,8 @@
 
 local UITheme = require("./UITheme")
 local W = require("./Widgets")
+local UICtx = require("./UICtx")
+local Brand = UICtx.data("Brand")
 local Signal = UITheme.core("Signal")
 
 local RotateCard = W.class(W.Control)
@@ -34,7 +36,7 @@ function RotateCard.new(c: any)
 	t:set_alignment(W.ALIGN_CENTER)
 	cc:add_child(t)
 	local s = UITheme.label(
-		"RoWorld is played in landscape.\nTurn your device sideways to continue.",
+		Brand.NAME .. " is played in landscape.\nTurn your device sideways to continue.",
 		15,
 		500,
 		UITheme.TEXT_2

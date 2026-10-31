@@ -5,6 +5,8 @@
 require("./prelude")
 local Products = require("../src/shared/Data/Products")
 local Purchases = require("../src/server/Purchases")
+-- (the paid paths, as upstream sells them: this fork turns them off with FREE_FOR_ALL)
+Purchases.FREE_FOR_ALL = false
 
 local fails = 0
 local function expect(c: any, w: string)
@@ -129,6 +131,9 @@ do
 			end,
 		},
 	})
+	-- (this fork created no products: give the crates test ids)
+	Products.crate_first.id = 7010
+	Products.crate.id = 7011
 	Purchases.load(B)
 	expect(
 		Purchases.process_receipt({ PlayerId = 99, ProductId = Products.crate_first.id, PurchaseId = "c1" })
@@ -541,6 +546,7 @@ do
 	expect(distinct == 3 and rows.u64.credits.crate == 0, "three crates open to three different items")
 	Products.crate3.id = 0
 	-- and the 10-crate pack (2026-10-27): ten credits for one receipt
+	Products.crate10.id = 7012 -- (a test id: this fork created no products)
 	local kind10, n10 = Purchases.kind_of(Products.crate10.id)
 	expect(kind10 == "crate" and n10 == 10, "the 10-pack grants 10 crates")
 	expect(

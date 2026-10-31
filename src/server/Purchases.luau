@@ -71,6 +71,11 @@ Purchases.MAX_CREDITS = 1000
 Purchases.MAX_STARS = 1000000000
 --- Stars for each Robux of an unlock bought a second time (what an Arsenal price works out to).
 Purchases.DUPLICATE_STARS_PER_ROBUX = 500
+--- Everything is free (this fork): every record owns every Arsenal item and every cosmetic its player
+--- may own (Cosmetics.may_own: not someone else's exclusive), and always holds FREE_CREDITS of each
+--- credit kind that isn't a crate (the takeover), however many are spent.
+Purchases.FREE_FOR_ALL = true
+Purchases.FREE_CREDITS = 99
 
 type Record = {
 	credits: { [string]: number },
@@ -178,6 +183,18 @@ local function clean(v: any, user_id: number?): Record
 			end
 		end
 	end
+	if Purchases.FREE_FOR_ALL then
+		for _, it in Arsenal.ITEMS do
+			rec.unlocks[it.key] = true
+		end
+		for _, list in { Cosmetics.all(), Cosmetics.shop_items(), Cosmetics.generals() } do
+			for _, it in list do
+				if Cosmetics.may_own(it.id, user_id) then
+					rec.owned[it.id] = true
+				end
+			end
+		end
+	end
 	if type(v.gifts) == "table" then
 		for id, on in v.gifts do
 			if on == true and type(id) == "string" then
@@ -212,6 +229,9 @@ local function clean(v: any, user_id: number?): Record
 				rec.credits[k] = math.clamp(math.floor(n), 0, Purchases.MAX_CREDITS)
 			end
 		end
+	end
+	if Purchases.FREE_FOR_ALL then
+		rec.credits.takeover = math.max(rec.credits.takeover or 0, Purchases.FREE_CREDITS)
 	end
 	if type(v.receipts) == "table" then
 		for _, r in v.receipts do

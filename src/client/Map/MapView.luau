@@ -52,7 +52,7 @@ MapView.SPAWN_MIN_RAD = 10
 MapView.SPAWN_MAX_RAD = 30
 
 local function report(site: string, err: any)
-	warn(string.format("[RoWorld] map view %s: %s", site, tostring(err)))
+	warn(string.format("[Game] map view %s: %s", site, tostring(err)))
 end
 
 local _reported: { [string]: boolean } = {}

@@ -53,7 +53,7 @@ local function optional(parent: Instance?, path: { string }): any
 	end
 	local ok, mod = pcall(require, node)
 	if not ok then
-		warn("[RoWorld] could not load " .. node:GetFullName() .. ": " .. tostring(mod))
+		warn("[Game] could not load " .. node:GetFullName() .. ": " .. tostring(mod))
 		return nil
 	end
 	return mod
@@ -75,7 +75,7 @@ local function call(obj: any, method: string, ...: any): any
 	if not ok then
 		if not call_warned[method] then
 			call_warned[method] = true
-			warn("[RoWorld] " .. method .. " failed: " .. tostring(res))
+			warn("[Game] " .. method .. " failed: " .. tostring(res))
 		end
 		return nil
 	end
@@ -498,7 +498,7 @@ function Main.start()
 		if ok then
 			Main.world = w
 		else
-			warn("[RoWorld] WorldView.new failed: " .. tostring(w))
+			warn("[Game] WorldView.new failed: " .. tostring(w))
 		end
 	end
 	Main.boot.world = os.clock()
@@ -524,10 +524,10 @@ function Main.start()
 				u:setup(session, Main.world, audio)
 			end)
 			if not ok2 then
-				warn("[RoWorld] UIRoot:setup failed: " .. tostring(err))
+				warn("[Game] UIRoot:setup failed: " .. tostring(err))
 			end
 		else
-			warn("[RoWorld] UIRoot.new failed: " .. tostring(u))
+			warn("[Game] UIRoot.new failed: " .. tostring(u))
 		end
 	end
 	local ui = Main.ui
@@ -634,7 +634,7 @@ function Main.launch_hooks(player: Player)
 				if best ~= nil then
 					session:send_intent({ type = "spawn", tile = best })
 					call(Main.world, "focus_tile", best, -1.0, 1.0)
-					print("[RoWorld] autosolo: spawn requested at tile", best)
+					print("[Game] autosolo: spawn requested at tile", best)
 				end
 				return
 			end

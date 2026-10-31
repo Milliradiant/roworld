@@ -8,6 +8,8 @@ local Shop = require("../src/shared/Data/Shop")
 local Cosmetics = require("../src/shared/Data/Cosmetics")
 local Products = require("../src/shared/Data/Products")
 local Purchases = require("../src/server/Purchases")
+-- (the paid paths, as upstream sells them: this fork turns them off with FREE_FOR_ALL)
+Purchases.FREE_FOR_ALL = false
 
 local fails = 0
 local function expect(c: any, w: string)

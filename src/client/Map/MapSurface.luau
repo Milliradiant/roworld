@@ -556,7 +556,7 @@ function MapSurface.set_map(self: MapSurface, map: any)
 	end
 	self.ok = all_ok
 	if not all_ok then
-		warn("[RoWorld] map: EditableImage unavailable (memory budget) — parts of the map cannot be drawn")
+		warn("[Game] map: EditableImage unavailable (memory budget) — parts of the map cannot be drawn")
 	end
 	self.ready = true
 	if self._state ~= nil then

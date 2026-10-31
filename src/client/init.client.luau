@@ -5,15 +5,15 @@ local dev = workspace:GetAttribute("AF_DEV")
 if type(dev) == "string" and dev ~= "" then
 	local mod = script:FindFirstChild("Dev") and script.Dev:FindFirstChild(dev)
 	if mod then
-		print("[RoWorld] client dev harness:", dev)
+		print("[Game] client dev harness:", dev)
 		require(mod)
 		return
 	end
-	warn("[RoWorld] AF_DEV harness not found on client:", dev)
+	warn("[Game] AF_DEV harness not found on client:", dev)
 end
 local Main = script:FindFirstChild("Main")
 if Main then
 	require(Main).start()
 else
-	print("[RoWorld] client boot (Main not yet written)")
+	print("[Game] client boot (Main not yet written)")
 end

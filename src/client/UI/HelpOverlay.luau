@@ -11,6 +11,7 @@ local W = require("./Widgets")
 local GlassPanel = require("./GlassPanel")
 local UICtx = require("./UICtx")
 local UIRules = require("./UIRules")
+local Brand = UICtx.data("Brand")
 local Signal = UITheme.core("Signal")
 local Defs = UICtx.core("Defs")
 
@@ -256,17 +257,25 @@ HelpOverlay.SECTIONS = {
 --- warranty, that the game may be shared under the licence, where the licence is) and the credits
 --- (2026-10-25: the AGPL licence and its notices and the copyright notice; the flags, map icons, sprites
 --- and effects are RoWorld's own or public domain since that day, and the World map since 2026-10-26).
---- NOTICE.md and LICENSE in the source have the full text.
+--- LICENSE in the source has the full text. The name and the modifier come from Data/Brand.
 HelpOverlay.LEGAL = {
-	"RoWorld is a modified version of OpenFront. © OpenFront and Contributors. Changes © 2026 Snick Co.",
-	"RoWorld is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License, version 3, with the additional terms in its LICENSE file. It comes with ABSOLUTELY NO WARRANTY. The licence comes with RoWorld's source code.",
+	string.format(
+		"%s is a modified version of RoWorld, itself a modified version of OpenFront. © OpenFront and Contributors. RoWorld's changes © 2026 Snick Co. Modified by %s, %d.",
+		Brand.NAME,
+		Brand.MODIFIED_BY,
+		Brand.MODIFIED_YEAR
+	),
+	string.format(
+		"%s is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License, version 3, with the additional terms in its LICENSE file. It comes with ABSOLUTELY NO WARRANTY. The licence comes with %s's source code.",
+		Brand.NAME,
+		Brand.NAME
+	),
 	"Maps made with Natural Earth and NOAA ETOPO1 data (public domain). Country flags from Wikimedia Commons (public domain). Music by Rodrigo Flores.",
-	"RoWorld is not affiliated with or endorsed by OpenFront.",
+	string.format("%s is not affiliated with or endorsed by OpenFront or Snick Co.", Brand.NAME),
 }
 --- Where the source lives, under the credits: plain text with the GitHub mark, since Roblox games
---- can't link off-platform (2026-10-25: "Source <github logo> <repo>" at the bottom; the public repo is
---- lukechatton/roworld, lukechatton/rofront is private).
-HelpOverlay.SOURCE_REPO = "lukechatton/roworld"
+--- can't link off-platform ("Source <github logo> <repo>" at the bottom; Data/Brand.SOURCE_REPO).
+HelpOverlay.SOURCE_REPO = Brand.SOURCE_REPO
 --- The card that pops up over the repo name when it's pressed (2026-10-25), and how long it stays.
 HelpOverlay.SOURCE_TIP = {
 	title = "Source code",

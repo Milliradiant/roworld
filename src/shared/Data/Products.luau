@@ -78,4 +78,11 @@ if Staging.here() then
 	end
 end
 
+--- This fork sells nothing: every item is free (server/Purchases.FREE_FOR_ALL), so no product exists
+--- here and every offer stays hidden. The ids above are RoWorld's, kept so its data still reads.
+for _, p in PRODUCTS do
+	p.id = 0
+	p.staging = 0
+end
+
 return PRODUCTS

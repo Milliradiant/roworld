@@ -7,6 +7,8 @@ local Subscription = require("../src/shared/Data/Subscription")
 local Cosmetics = require("../src/shared/Data/Cosmetics")
 local Stars = require("../src/shared/Data/Stars")
 local Purchases = require("../src/server/Purchases")
+-- (the paid paths, as upstream sells them: this fork turns them off with FREE_FOR_ALL)
+Purchases.FREE_FOR_ALL = false
 local Rewards = require("../src/server/Rewards")
 local General = require("../src/server/General")
 
