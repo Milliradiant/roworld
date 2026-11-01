@@ -34,6 +34,7 @@ local SimNaval = require("./SimNaval")
 local SimWarships = require("./SimWarships")
 local SimNukes = require("./SimNukes")
 local SimArsenal = require("./SimArsenal")
+local SimGarrisons = require("./SimGarrisons")
 local SimAI = require("./SimAI")
 local Teams = require("./Teams")
 local WorldMap = require("./WorldMap")
@@ -55,6 +56,7 @@ SimNaval.install(Sim)
 SimWarships.install(Sim)
 SimNukes.install(Sim)
 SimArsenal.install(Sim)
+SimGarrisons.install(Sim)
 
 Sim.TICK_RATE = TICK_RATE
 --- Owners whose start lies within these many tiles (of the original 1024-wide grid; scaled by the
@@ -145,6 +147,7 @@ function Sim.new(p_map: any, config: { [string]: any }?): any
 	self:_init_warships()
 	self:_init_nukes()
 	self:_init_arsenal()
+	self:_init_garrisons()
 	Coop.check()
 	if type(cfg.defense_posts_shoot) == "boolean" then
 		self.defense_posts_shoot = cfg.defense_posts_shoot
@@ -412,6 +415,7 @@ function Sim.step(self: any): { [string]: any }
 				self:construction_tick()
 				self.ai:tick(self)
 				self:attacks_tick()
+				self:garrisons_tick()
 				self:units_tick()
 				self:warships_tick()
 				self:ports_tick()
@@ -458,6 +462,7 @@ function Sim._step_profiled(self: any)
 	self.ai:tick(self)
 	t = self:_lap(3, t)
 	self:attacks_tick()
+	self:garrisons_tick()
 	t = self:_lap(4, t)
 	self:units_tick()
 	self:warships_tick()
@@ -541,6 +546,7 @@ function Sim.snapshot(self: any): { [string]: any }
 		shells = self:shell_rows(),
 		sam_missiles = self:sam_rows(),
 		attacks = self:attack_rows(),
+		garrisons = self:garrison_rows(),
 		allies = allies,
 		requests = reqs,
 	}
@@ -955,7 +961,11 @@ function Sim._apply_intent(self: any, id: number, it: { [string]: any })
 		return
 	end
 	if kind == "attack" then
-		self:intent_attack(id, tile, _num(it, "ratio", Rules.DEFAULT_ATTACK_RATIO))
+		-- (near one of the player's garrisons, the attack is launched from it: SimGarrisons)
+		local ratio = _num(it, "ratio", Rules.DEFAULT_ATTACK_RATIO)
+		if not self:garrison_attack(id, tile, ratio) then
+			self:intent_attack(id, tile, ratio)
+		end
 	elseif kind == "boat" then
 		self:launch_boat(id, tile, _num(it, "ratio", Rules.DEFAULT_ATTACK_RATIO))
 	elseif kind == "build" then
@@ -996,6 +1006,10 @@ function Sim._apply_intent(self: any, id: number, it: { [string]: any })
 		self:donate(id, _int(it, "target", 0), _int(it, "troops", 0))
 	elseif kind == "reinforce" then
 		self:reinforce(id)
+	elseif kind == "station" then
+		self:station(id, tile, _num(it, "ratio", Rules.DEFAULT_ATTACK_RATIO))
+	elseif kind == "disband" then
+		self:disband(id, _int(it, "uid", 0))
 	end
 end
 
@@ -1530,6 +1544,7 @@ function Sim._economy_tick(self: any)
 	local o_bonus_acc = self.o_bonus_acc
 	local max_troops = self.R.max_troops
 	local troop_growth_applied = Rules.troop_growth_applied
+	local gar_of = self.gar_of
 	local o_bot = self.o_bot
 	local o_skill = self.o_skill
 	local NOVICE = Sim.NOVICE_SKILL
@@ -1548,7 +1563,14 @@ function Sim._economy_tick(self: any)
 		o_cap[id] = cap
 		-- Per-tick player update: + troopIncreaseRate troops (whole troops: truncated) and
 		-- + goldAdditionRate gold every tick, never during the spawn phase.
-		o_troops[id] += troop_growth_applied(tkind, o_troops[id], cap, tdiff)
+		-- (garrisons count towards the growth and the cap; what grows joins the reserve, which never
+		-- goes below 0 when garrisons hold more than the cap)
+		local gar = if gar_of ~= nil and gar_of[id] ~= nil then self:garrison_total(id) else 0.0
+		if gar > 0.0 then
+			o_troops[id] = math.max(0.0, o_troops[id] + troop_growth_applied(tkind, o_troops[id] + gar, cap, tdiff))
+		else
+			o_troops[id] += troop_growth_applied(tkind, o_troops[id], cap, tdiff)
+		end
 		if (tick + id) % 10 == 0 then
 			o_income[id] = Rules.passive_income(kind, o_tiles[id])
 		end
@@ -1609,6 +1631,7 @@ function Sim._eliminate(self: any, id: number, killer: number)
 	end
 	self.o_alive[id] = 0
 	self.o_troops[id] = 0.0
+	self:_clear_garrisons(id)
 	self:ev({ Ev.OWNER_OUT, id, killer })
 	self:end_attacks_of(id)
 	self:remove_units_of(id)

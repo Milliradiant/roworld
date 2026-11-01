@@ -273,6 +273,7 @@ function SimArsenal.install(C)
 			dbg_flow[o * 5 + 3] += kill
 			o_troops[o] = troops - kill
 			if kind ~= N_SHELL then
+				self:_scale_garrisons(o, keep)
 				-- the same share of its armies in the field and at sea
 				for _, a in self.attacks do
 					if not a.dead and a.attacker == o then

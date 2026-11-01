@@ -204,6 +204,11 @@ function HelpOverlay._fill_rules(text: string): string
 			then " Defense Posts also fire on enemy boats in range."
 			else "",
 		win = tostring(Defs.round(R.WIN_SHARE * 100.0)),
+		g_max = tostring(R.GARRISON_MAX),
+		g_range = tostring(Defs.round(R.garrison_range())),
+		g_form = tostring(Defs.round(R.GARRISON_FORM_TICKS / R.TICK_RATE)),
+		g_mag = tostring(Defs.round(R.GARRISON_MAG)),
+		sight = tostring(Defs.round(R.FOG_SIGHT_FULL)),
 	})
 end
 
@@ -219,6 +224,18 @@ HelpOverlay.SECTIONS = {
 		color = "orange",
 		title = "Expand & attack",
 		text = "Click neutral land beside you to expand, or a nation you border to attack it. The Attack bar sets the share of troops you send (Q / E, or Shift + wheel). Troops regrow on their own, fastest well below your cap.",
+	},
+	{
+		icon = "troops",
+		color = "cyan",
+		title = "Garrisons",
+		text = "Your troops wait in a reserve spread over all your land. Press G (or right-click your land, Station) to park the Attack bar's share of it at a spot: the troops march there in {g_form} s and guard everything within {g_range} tiles, making it up to {g_mag}× as costly to take, while the rest of your land is held more thinly. Attacks ordered near a garrison launch from it. Up to {g_max}; Disband sends one home. Lose its tile and half of it falls back.",
+	},
+	{
+		icon = "eye",
+		color = "violet",
+		title = "Fog of war",
+		text = "You only see {sight} tiles past your own and your allies' land, and around your ships. Beyond that the map is bare: no borders, cities, boats, garrisons or troop counts. Scout with ships, ally to share sight, and keep your stacks out of view.",
 	},
 	{
 		icon = "boat",
@@ -294,6 +311,7 @@ HelpOverlay.KEYS_DESKTOP = {
 	{ "1 – 0", "Build & nukes" },
 	{ "Q / E", "Attack share −/+" },
 	{ "Space", "Attack at cursor" },
+	{ "G", "Station troops at cursor" },
 	{ "Backspace", "Retreat your latest attack" },
 	{ "X / Right-click", "Cancel" },
 	{ "H", "This help" },
@@ -309,6 +327,7 @@ HelpOverlay.KEYS_TOUCH = {
 	{ "Pinch", "Zoom" },
 	{ "Tap a slot", "Tap the globe, then ✓" },
 	{ "Tap your land", "Inspect" },
+	{ "Long-press your land", "Station troops (garrison)" },
 	{ "Tap a warship", "Then tap the sea to move it" },
 	{ "Tap an ally", "Donate or break the alliance" },
 }
@@ -397,7 +416,7 @@ function HelpOverlay._build(self)
 	local paused = ctx:mode() == UICtx.MODE_SOLO and ctx:in_match()
 	tv:add_child(
 		UITheme.label(
-			"Conquer the real world in seven ideas." .. (if paused then "  ·  Game paused" else ""),
+			"Conquer the real world in nine ideas." .. (if paused then "  ·  Game paused" else ""),
 			13,
 			500,
 			UITheme.TEXT_2

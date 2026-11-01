@@ -524,7 +524,8 @@ function StructureLayer._visit(
 	local cam = self.view.rig
 	local s = st.structures[sid]
 	local p = self._plates[sid]
-	if s ~= nil then
+	local fog = st.fog
+	if s ~= nil and (fog == nil or fog:visible(s.tile)) then
 		local x, y = cam:tile_to_screen(s.tile)
 		local size = base * (SHAPE_SCALE[s.kind + 1] or 1.0)
 		if cam:on_screen(x, y, size) then
@@ -573,6 +574,14 @@ function StructureLayer.tick(self: any, _dt: number)
 	end
 	local anim = self._anim
 	local touched = self._touched
+	-- the fog of war (Core/FogOfWar): what lies out of sight isn't drawn; sight changed, draw again
+	local fog = st.fog
+	local fog_v = if fog ~= nil then fog.version else 0
+	if fog_v ~= self._fog_v then
+		self._fog_v = fog_v
+		self._dirty = true
+	end
+	local fog_on = fog ~= nil and fog.active
 	if not self._dirty and cam.version == self._cam_version then
 		-- nothing moved: only the plates being built or reloading change (their bar, and their
 		-- style once finished) — late games always have some, and redrawing every plate each frame
@@ -609,6 +618,9 @@ function StructureLayer.tick(self: any, _dt: number)
 		local y = ay + (tile // W + 0.5 - cv) * sc
 		local size = base * (SHAPE_SCALE[s.kind + 1] or 1.0)
 		if not (x >= -size and y >= -size and x <= vw + size and y <= vh + size) then
+			continue
+		end
+		if fog_on and not fog:visible(tile) then
 			continue
 		end
 		local p = plates[sid]

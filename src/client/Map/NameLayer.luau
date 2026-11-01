@@ -596,6 +596,14 @@ function NameLayer.tick(self: any, dt: number)
 		local hovered = id == self.hover_owner
 		local sx, sy = cam:map_to_screen(wx, wy)
 		local vis = (line_px >= cull_px or hovered) and cam:on_screen(sx, sy, line_px * 4)
+		-- the fog of war (Core/FogOfWar): a name sits where its land can be seen, or not at all
+		local fog = st.fog
+		if vis and fog ~= nil and fog.active then
+			local mw, mh = st.W or 1, st.H or 1
+			local fx = math.clamp(math.floor(wx), 0, mw - 1)
+			local fy = math.clamp(math.floor(wy), 0, mh - 1)
+			vis = fog:visible(fy * mw + fx)
+		end
 		if not vis then
 			if p.shown then
 				p.frame.Visible = false
@@ -653,7 +661,8 @@ function NameLayer.tick(self: any, dt: number)
 			p.badge.Visible = human
 			p.px = -1 -- resize the badge with the plate
 		end
-		local troops = o.troops or 0
+		-- (the whole army at home: the reserve and its garrisons, Core/SimGarrisons)
+		local troops = (o.troops or 0) + (if st.garrison_total ~= nil then st:garrison_total(id) else 0)
 		if p.troop_n ~= troops then
 			p.troop_n = troops
 			local tt = NumberFormat.render_troops(troops)

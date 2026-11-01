@@ -13,9 +13,9 @@ Brand.NAME = "Terra"
 --- The title screen's wordmark (capitals).
 Brand.WORDMARK = "TERRA"
 --- The public repository with this game's source (owner/repo on GitHub).
-Brand.SOURCE_REPO = "Unproblematical/roworld"
+Brand.SOURCE_REPO = "Milliradiant/roworld"
 --- Who made this version's changes, and when (the AGPL asks a modified version to say so).
-Brand.MODIFIED_BY = "Unproblematical"
+Brand.MODIFIED_BY = "Milliradiant"
 Brand.MODIFIED_YEAR = 2026
 
 return Brand

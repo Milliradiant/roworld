@@ -10,6 +10,20 @@ OpenFront or Snick Co.
 
 ## What's different from RoWorld
 
+- **Garrisons (stationed troops, like Risk).** Your army is a reserve spread evenly over your land, as
+  before, plus up to 5 garrisons: stacks you park at a spot (G at the cursor, or right-click your land,
+  Station). A garrison guards the land within 20 tiles: attacks there cost up to 4x the troops and take
+  up to 3x as long, and its own tile holds while it stands, but the rest of your land is held more
+  thinly. Attacks ordered near a garrison are launched from it. Lose its tile and half of it falls back.
+  (`src/shared/Core/SimGarrisons.luau`, rules under "Garrisons" in `Core/Rules.luau`; tests:
+  `tests/garrisons.luau`, `garrison_ui.luau`, `garrison_layer.luau`.)
+- **Fog of war, always on.** You see 48 tiles past your own and your allies' land, and around your
+  warships and transports. Beyond that the map shows bare terrain: no borders, structures, units,
+  garrisons, names or troop counts. Off for spectators, during the spawn phase and after the match.
+  It is drawn on each player's screen (the server still sends everyone the whole match), so it keeps
+  honest players honest; a cheater with exploit tools could still peek. (`src/shared/Core/FogOfWar.luau`,
+  `Rules.FOG_OF_WAR` turns it off; tests: `tests/fog_of_war.luau`, `fog_surface.luau`.)
+
 - **Everything is free.** Every Arsenal item, skin, flag and shop flag is owned by every player, and the
   takeover is always available. No Robux purchases, no crates for sale, no General subscription.
   (`Purchases.FREE_FOR_ALL` in `src/server/Purchases.luau`; `tests/free_for_all.luau` checks it.)

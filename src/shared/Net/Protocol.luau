@@ -133,6 +133,8 @@ Protocol.INTENT_TYPES = {
 	"donate",
 	"ally_extend", -- {target}: ask to renew the alliance with `target` (last 30 s before it expires)
 	"reinforce", -- {}: the Arsenal's Reinforcements (gold for troops; Sim.reinforce)
+	"station", -- {tile, ratio}: station that share of the reserve at an own tile (SimGarrisons)
+	"disband", -- {uid}: garrison `uid` goes back to the reserve (SimGarrisons)
 }
 local INTENT_INDEX: { [string]: number } = {}
 for i, name in Protocol.INTENT_TYPES do

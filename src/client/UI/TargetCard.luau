@@ -180,12 +180,24 @@ function TargetCard.show_target(self, t: number, k: string, act: any)
 		self._sub:set_text(
 			string.format("%s  ·  %s", ctx:kind_title(if o ~= nil then o.kind else 0), ctx:terrain_title(t))
 		)
-		self._troops:set_text("Troops " .. UITheme.fmt_troops(if o ~= nil then o.troops else 0))
+		-- their army: the reserve and their garrisons (Core/SimGarrisons); what holds this tile is the
+		-- reserve, and the garrison guarding it if one can be seen
+		local reserve = if o ~= nil then o.troops else 0
+		self._troops:set_text("Troops " .. UITheme.fmt_troops(s:army(self.owner_id)))
 		self._land:set_text("Land " .. UITheme.fmt_pct(s:land_share(self.owner_id)))
 		local mine = tonumber(act.troops) or 0.0
-		local theirs = if o ~= nil then o.troops else 0
+		local theirs = reserve
+		local R = s.rules
+		local guard = s:garrison_near(self.owner_id, t, R.garrison_range(), true)
+		if guard ~= nil and (s.fog == nil or s.fog:visible(guard.tile)) then
+			theirs += guard.troops
+		end
 		self._odds:set_visible(true)
-		if theirs > mine * 1.5 then
+		if guard ~= nil and theirs > mine * 1.5 and (s.fog == nil or s.fog:visible(guard.tile)) then
+			self._odds:set_text(string.format("A garrison guards it: they outnumber your %s troops", troops))
+			self._odds:set_color(UITheme.ORANGE)
+			self._odds_warn = true
+		elseif theirs > mine * 1.5 then
 			self._odds:set_text(string.format("They outnumber the %s troops you would send", troops))
 			self._odds:set_color(UITheme.ORANGE)
 			self._odds_warn = true

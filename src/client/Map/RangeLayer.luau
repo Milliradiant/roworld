@@ -352,7 +352,12 @@ function RangeLayer._update_hot(self: any)
 	local _, spread = VR.nuke_radii(Defs.N_MIRV)
 	for sid, s in self._sites do
 		local l = self._lvl[sid]
-		if s[1] ~= Defs.S_SAM or not self:_hostile(s[2], local_id) or (l ~= nil and l[2] > cur) then
+		if
+			s[1] ~= Defs.S_SAM
+			or not self:_hostile(s[2], local_id)
+			or (l ~= nil and l[2] > cur)
+			or (state.fog ~= nil and not state.fog:visible(s[3]))
+		then
 			continue
 		end
 		local r = self:_range_of(sid, s[1], cur)
@@ -450,6 +455,9 @@ function RangeLayer._rebuild(self: any)
 		local r = self:_range_of(sid, s[1], cur)
 		local own = local_id ~= 0 and s[2] == local_id
 		local hostile = not own and self:_hostile(s[2], local_id)
+		if hostile and self._state.fog ~= nil and not self._state.fog:visible(s[3]) then
+			continue -- (out of sight: Core/FogOfWar)
+		end
 		local cls = -1
 		if s[1] == Defs.S_SAM then
 			if nuke_aim and hostile then

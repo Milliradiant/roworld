@@ -290,6 +290,9 @@ function FalloutGlow.on_flags_changed(self: any, changed: { number })
 		if i >= bw or j >= bh then
 			continue
 		end
+		if st.fog ~= nil and not st.fog:visible(tile) then
+			continue -- (fresh fallout out of sight doesn't glow: Core/FogOfWar)
+		end
 		local b = j * bw + i
 		local now = band(v % 256, F_FALLOUT) ~= 0
 		local was = self._was[b] == true

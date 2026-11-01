@@ -1020,6 +1020,52 @@ function UIRules.primary(self: any, tile: number): { [string]: any }
 	return table.clone(res)
 end
 
+-- ---------------------------------------------------------------------------------------------
+-- Garrisons (Core/SimGarrisons)
+-- ---------------------------------------------------------------------------------------------
+
+--- The garrison of `me` an attack at `tile` would be launched from (the Sim's rule: the nearest ready
+--- one within GARRISON_REACH x its range), or nil.
+function UIRules.garrison_launcher(s: any, me: number, tile: number): any
+	if s == nil or me == 0 or next(s.garrisons) == nil then
+		return nil
+	end
+	local R = s.rules
+	return s:garrison_near(me, tile, R.garrison_range() * R.GARRISON_REACH, true)
+end
+
+--- What a station order at `tile` would do: { ok, reason, troops, merge (the garrison it reinforces,
+--- or nil) }.
+function UIRules.station_plan(self: any, tile: number): { [string]: any }
+	local ctx = self.ctx
+	local s = ctx.state
+	local me = ctx:me()
+	local out = { ok = false, reason = "", troops = 0, merge = nil } :: { [string]: any }
+	if s == nil or me == 0 or s:tile_owner(tile) ~= me then
+		out.reason = "Station troops on your own land"
+		return out
+	end
+	local o = ctx:my()
+	local troops = math.floor((if o ~= nil then (o.troops or 0) else 0) * ctx:order_ratio())
+	out.troops = troops
+	local R = s.rules
+	out.merge = s:garrison_near(me, tile, R.garrison_range() * R.GARRISON_MERGE, false)
+	local count = 0
+	for _, g in s.garrisons do
+		if g.owner == me then
+			count += 1
+		end
+	end
+	if troops < 1 then
+		out.reason = "No troops in reserve"
+	elseif out.merge == nil and count >= R.GARRISON_MAX then
+		out.reason = string.format("%d garrisons already: disband one", R.GARRISON_MAX)
+	else
+		out.ok = true
+	end
+	return out
+end
+
 --- Drops the primary() cache (tests / after the world changed under the same tick).
 function UIRules.invalidate(self: any)
 	self._pc_tile = -1
@@ -1077,6 +1123,13 @@ function UIRules._primary(self: any, tile: number): { [string]: any }
 	local fallout = own == 0 and s:has_fallout(tile)
 	local share = ctx:order_ratio()
 	local troops = (o.troops or 0) * share
+	-- near one of the player's garrisons the attack is launched from it (Core/SimGarrisons; the Sim
+	-- falls back to the reserve when the garrison's stretch doesn't touch the target)
+	local garrison = UIRules.garrison_launcher(s, me, tile)
+	if garrison ~= nil and (own == 0 or s:borders_tile(me, tile) or ctx.borders:borders_owner(own)) then
+		troops = garrison.troops * share
+		out.garrison = garrison.gid
+	end
 	out.troops = troops
 	if troops < 1.0 then
 		-- (the floor under a new player's army: UICtx.troop_floor)
@@ -1097,8 +1150,16 @@ function UIRules._primary(self: any, tile: number): { [string]: any }
 		out.type = if own == 0 then "expand" else "attack"
 		out.ok = true
 		out.verb = if own == 0 then (if fallout then "Expand into fallout" else "Expand") else "Attack"
+		if out.garrison ~= nil then
+			out.verb ..= " from garrison"
+		end
 		out.icon = "attack"
 		return out
+	end
+	if out.garrison ~= nil then
+		-- (no land route from the garrison: a boat goes from the reserve)
+		out.garrison = nil
+		out.troops = (o.troops or 0) * share
 	end
 	local landing = self:boat_landing(tile)
 	if landing >= 0 then
@@ -1141,8 +1202,14 @@ function UIRules.confirm_text(self: any, action: { [string]: any }): string
 	if ty == "spawn" then
 		return "Starting position set"
 	elseif ty == "expand" then
+		if action.garrison ~= nil then
+			return "Expanding from your garrison with " .. troops
+		end
 		return "Expanding with " .. troops
 	elseif ty == "attack" then
+		if action.garrison ~= nil then
+			return string.format("Attacking %s from your garrison with %s", s:owner_name(target), troops)
+		end
 		return string.format("Attacking %s with %s", s:owner_name(target), troops)
 	elseif ty == "boat" then
 		if target == 0 then
@@ -1231,6 +1298,32 @@ function UIRules.radial_items(self: any, tile: number): { { [string]: any } }
 				)
 				break
 			end
+		end
+	end
+
+	if playing and own == me then
+		-- garrisons (Core/SimGarrisons): station the attack share of the reserve here, or send the one
+		-- nearby home
+		local plan = self:station_plan(tile)
+		table.insert(items, {
+			id = "station",
+			label = if plan.merge ~= nil then "Reinforce" else "Station",
+			icon = "troops",
+			ok = plan.ok,
+			reason = plan.reason,
+			danger = false,
+			troops = plan.troops,
+		})
+		if plan.merge ~= nil then
+			table.insert(items, {
+				id = "disband",
+				label = "Disband",
+				icon = "retreat",
+				ok = true,
+				reason = "",
+				danger = false,
+				gid = plan.merge.gid,
+			})
 		end
 	end
 

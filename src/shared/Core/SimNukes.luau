@@ -618,6 +618,8 @@ function SimNukes.install(C)
 		local inner, radius = self.R.nuke_radii(n.kind)
 		local inner2 = inner * inner
 		local to = n.to_tile
+		-- (garrisons inside the blast are wiped out before their ground turns to fallout)
+		self:_garrisons_blast(to, radius, n.owner)
 		local tiles = self:disk_tiles(to, radius, true)
 		local lost = {}
 		local before = {}
@@ -713,6 +715,7 @@ function SimNukes.install(C)
 			local f = (math.max(0.0, tiles_before - n_lost) / math.max(tiles_before, 1)) ^ 5.0
 			dbg_flow[o * 5 + 3] += o_troops[o] * (1.0 - f)
 			o_troops[o] *= f
+			self:_scale_garrisons(o, f)
 			for _, a in self.attacks do
 				if not a.dead and a.attacker == o then
 					a.troops *= f
@@ -727,10 +730,14 @@ function SimNukes.install(C)
 		end
 		local k = self.R.K_AREA
 		local warhead_death = Rules.warhead_death
+		local had = o_troops[o]
 		for _ = 1, n_lost do
 			local d = math.min(k * warhead_death(o_troops[o], cap), math.max(0.0, o_troops[o] - 0.03 * cap))
 			dbg_flow[o * 5 + 3] += d
 			o_troops[o] -= d
+		end
+		if had >= 1.0 then
+			self:_scale_garrisons(o, o_troops[o] / had)
 		end
 		for _, a in self.attacks do
 			if not a.dead and a.attacker == o then

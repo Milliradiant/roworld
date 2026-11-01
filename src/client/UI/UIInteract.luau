@@ -1063,6 +1063,22 @@ function UIInteract.on_radial(self: any, id: string, tile: number)
 		)
 		return
 	end
+	if id == "station" then
+		self:station_at(tile, pos)
+		return
+	elseif id == "disband" then
+		local g = s:garrison_near(ctx:me(), tile, s.rules.garrison_range() * s.rules.GARRISON_MERGE, false)
+		if g ~= nil then
+			ctx:send({ type = "disband", uid = g.gid })
+			self:_float(
+				string.format("Garrison disbanded: %s troops back in reserve", T().fmt_troops(g.troops + g.pending)),
+				"retreat",
+				T().CYAN,
+				pos
+			)
+		end
+		return
+	end
 	if id == "attack" then
 		local act = ctx.rules:primary(tile)
 		ctx:send({ type = "attack", tile = tile, ratio = ctx:order_ratio() })
@@ -1160,6 +1176,34 @@ function UIInteract.retreat(self: any, aid: number)
 	self:_float("Retreating from " .. who, "retreat", T().CYAN, ctx:mouse_pos())
 end
 
+--- Station the attack share of the reserve at `tile` (Core/SimGarrisons; the radial's Station and
+--- the G key). False when it can't.
+function UIInteract.station_at(self: any, tile: number, pos: Vector2?): boolean
+	local ctx = self.ctx
+	local where = pos or ctx:mouse_pos()
+	local plan = ctx.rules:station_plan(tile)
+	if not plan.ok then
+		ctx:sfx("deny")
+		self:_float(tostring(plan.reason), "info", T().RED, where)
+		return false
+	end
+	ctx:send({ type = "station", tile = tile, ratio = ctx:order_ratio() })
+	ctx:sfx("click")
+	local R = ctx.state.rules
+	self:_float(
+		string.format(
+			"%s %s troops: ready in %d s",
+			if plan.merge ~= nil then "Reinforcing with" else "Stationing",
+			T().fmt_troops(plan.troops),
+			math.floor(R.GARRISON_FORM_TICKS / 10 + 0.5)
+		),
+		"troops",
+		T().CYAN,
+		where
+	)
+	return true
+end
+
 --- Backspace: pull back the most recent outgoing attack.
 function UIInteract.retreat_latest(self: any): boolean
 	local ctx = self.ctx
@@ -1249,7 +1293,7 @@ function UIInteract.hover_spec(self: any, tile: number, pinned: boolean?): { [st
 		spec.badge_color = ctx:relation_color(rel)
 		spec.sub = string.format("%s  ·  %s", ctx:kind_title(o.kind), terrain)
 		local rows = {
-			{ "Troops", Th.fmt_troops(o.troops), Th.TEXT },
+			{ "Troops", Th.fmt_troops(s:army(own)), Th.TEXT },
 			{ "Land", Th.fmt_pct(s:land_share(own)), Th.TEXT },
 		}
 		if own == ctx:me() or pinned then
@@ -1266,6 +1310,15 @@ function UIInteract.hover_spec(self: any, tile: number, pinned: boolean?): { [st
 					{ "Building…", Th.fmt_time(math.ceil((st.active_tick - s.tick) / Defs.TICK_RATE)), Th.ORANGE }
 				)
 			end
+		end
+		-- a garrison guarding this tile (Core/SimGarrisons), if it can be seen
+		local guard = s:garrison_near(own, tile, s.rules.garrison_range(), false)
+		if guard ~= nil and (s.fog == nil or s.fog:visible(guard.tile)) then
+			local gt = Th.fmt_troops(guard.troops)
+			if guard.pending >= 1 then
+				gt ..= " +" .. Th.fmt_troops(guard.pending)
+			end
+			table.insert(rows, { "Garrison", gt, Th.CYAN })
 		end
 		if s:is_traitor(own) then
 			table.insert(
@@ -1667,6 +1720,13 @@ function UIInteract._on_key(self: any, key: Enum.KeyCode, echo: boolean): boolea
 		end
 	elseif key == K.Backspace then
 		handled = ui:screen() == "play" and self.enabled and self:retreat_latest()
+	elseif key == K.G then
+		-- station troops at the cursor (Core/SimGarrisons)
+		if ui:screen() == "play" and self.enabled and self.hover_tile >= 0 then
+			self:station_at(self.hover_tile, nil)
+		else
+			handled = false
+		end
 	elseif key == K.Q or key == K.E then
 		if ui:screen() == "play" and self.enabled then
 			ctx:step_ratio(if key == K.E then 1 else -1)

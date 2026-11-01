@@ -762,30 +762,41 @@ function CommandBar.refresh(self, animate: boolean?)
 	-- (the leader from one pass, not the whole ranking sorted, 2026-10-27)
 	local leader = ctx:leader()
 	self._crown:set_modulate_a(if leader ~= nil and leader.id == o.id then 1.0 else 0.0)
+	-- (the number is the reserve, what attacks and boats can send; the bar is the whole army against
+	-- the cap, garrisons included: Core/SimGarrisons)
+	local stationed = s:garrison_total(o.id)
+	local army = o.troops + stationed
 	self._troops:set_value(o.troops, anim)
 	self._troops_cap:set_text("/ " .. T.fmt_troops(o.max_troops))
 	local bar_col = T.lerp(col, T.CYAN, 0.35)
 	self._troops_bar.fill_color = bar_col
-	self._troops_bar:set_target(o.troops / math.max(o.max_troops, 1.0), not anim)
+	self._troops_bar:set_target(army / math.max(o.max_troops, 1.0), not anim)
 	self._gold:set_value(o.gold, anim)
 	self._m_troops:set_value(o.troops, anim)
 	self._m_gold:set_value(o.gold, anim)
 	self._m_troops_bar.fill_color = bar_col
-	self._m_troops_bar:set_target(o.troops / math.max(o.max_troops, 1.0), not anim)
+	self._m_troops_bar:set_target(army / math.max(o.max_troops, 1.0), not anim)
 	self._income:set_text(T.fmt_rate(o.income))
 	T.set_font_color(self._income, if o.income > 0 then T.GREEN else T.TEXT_3)
 	-- Growth: the troop-rate label — "+{troops gained per second}/s" (NumberFormat clamps
 	-- at 0, so a nation above its cap after losing land reads +0/s), green while the rate is not
 	-- falling and orange once it is (sample_growth). Attacks spend troops but do not slow it.
-	local per_tick = Rules.troop_growth(o.kind, o.troops, math.max(o.max_troops, 1), self:_difficulty())
+	local per_tick = Rules.troop_growth(o.kind, army, math.max(o.max_troops, 1), self:_difficulty())
 	self._rate = per_tick * Defs.TICK_RATE
 	self._growth:set_text(UIRules().troop_rate_text(self._rate))
 	T.set_font_color(self._growth, if self._rate_up then T.GREEN else T.ORANGE)
 	self._m_growth:set_text(self._growth.text)
 	T.set_font_color(self._m_growth, if self._rate_up then T.GREEN else T.ORANGE)
 	local at_war = self:_committed_troops()
-	self._committed:set_modulate_a(if at_war > 0 then 1.0 else 0.0)
-	self._committed:set_text(if at_war > 0 then string.format("%s at war", T.fmt_troops(at_war)) else "")
+	local parts = {}
+	if at_war > 0 then
+		table.insert(parts, string.format("%s at war", T.fmt_troops(at_war)))
+	end
+	if stationed > 0 then
+		table.insert(parts, string.format("%s stationed", T.fmt_troops(stationed)))
+	end
+	self._committed:set_modulate_a(if #parts > 0 then 1.0 else 0.0)
+	self._committed:set_text(table.concat(parts, "  ·  "))
 	self:_refresh_ratio()
 	self:refresh_buttons()
 end
@@ -824,6 +835,10 @@ function CommandBar.stats_spec(self): { [string]: any }
 		{ "Troops", string.format("%s / %s", T.fmt_troops(o.troops), T.fmt_troops(o.max_troops)) },
 		{ "Growth", self._growth.text, if self._rate_up then T.GREEN else T.ORANGE },
 	}
+	local stationed = s:garrison_total(o.id)
+	if stationed > 0 then
+		table.insert(rows, { "Stationed", T.fmt_troops(stationed), T.CYAN })
+	end
 	local at_war = self:_committed_troops()
 	if at_war > 0 then
 		table.insert(rows, { "At war", T.fmt_troops(at_war), T.ORANGE })
@@ -878,7 +893,8 @@ function CommandBar.sample_growth(self)
 		return
 	end
 	local Rules = UITheme.core("Rules")
-	local rate = Rules.troop_growth(o.kind, o.troops, math.max(o.max_troops, 1), self:_difficulty())
+	local army = o.troops + ctx.state:garrison_total(o.id)
+	local rate = Rules.troop_growth(o.kind, army, math.max(o.max_troops, 1), self:_difficulty())
 	self._rate_up = UIRules().troop_rate_rising(rate, self._last_growth)
 	self._last_growth = rate
 end

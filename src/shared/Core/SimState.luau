@@ -256,6 +256,10 @@ local function set_owner(self: any, t: number, nw: number)
 	if readi32(self.struct_at, t * 4) ~= 0 then
 		self:_struct_tile_changed(t, old, nw)
 	end
+	local gar_at = self.gar_at
+	if gar_at ~= nil and gar_at[t] ~= nil then
+		self:_garrison_tile_changed(t, old, nw)
+	end
 end
 
 --- True if `id` owns a 4-neighbour of `t`.

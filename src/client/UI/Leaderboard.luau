@@ -175,13 +175,20 @@ function Row.set_row(self, o: any, r: number)
 	end
 	self.name_l:set_text(o.name)
 	self.land:set_text(T.fmt_pct(s:land_share(o.id)))
-	self.troops:set_text(T.fmt_troops(o.troops))
+	-- the whole army (reserve and garrisons, Core/SimGarrisons); under the fog of war (Core/FogOfWar)
+	-- only for a nation whose land can be seen
+	local fog = s.fog
+	local hidden = fog ~= nil and not self.is_me and not fog:owner_seen(o.id)
+	local army = s:army(o.id)
+	self.troops:set_text(if hidden then "?" else T.fmt_troops(army))
 	-- Threat context: a neighbour with over 3x our army reads red.
 	local mine = ctx:my()
+	local mine_army = if mine ~= nil then s:army(mine.id) else 0
 	local threat = mine ~= nil
 		and not self.is_me
-		and mine.troops > 0
-		and o.troops > 3 * mine.troops
+		and not hidden
+		and mine_army > 0
+		and army > 3 * mine_army
 		and not s:are_allies(ctx:me(), o.id)
 		and ctx.borders ~= nil
 		and ctx.borders:borders_owner(o.id)

@@ -798,6 +798,9 @@ function SimAttacks.install(C: any)
 		local border1 = math.max(border_of, 1.0)
 		local dbg_flow = self.dbg_flow
 		local cap = R.MAX_TILES_PER_TICK
+		-- the defender's garrisons (SimGarrisons): a guarded tile is held by the reserve and the garrison
+		local gar_list = if neutral or self.gar_of == nil then nil else self.gar_of[tg]
+		local has_gar = gar_list ~= nil and #gar_list > 0
 		local budget = 1.0
 		local taken = 0
 		while budget > 0.0 do
@@ -808,7 +811,7 @@ function SimAttacks.install(C: any)
 				return
 			end
 			local t = a.head
-			if t >= 0 and (readi32(owner, t * 4) ~= tg or not touches(self, t, at)) then
+			if t >= 0 and (readi32(owner, t * 4) ~= tg or not touches(self, t, at) or (has_gar and self:garrison_holds(t))) then
 				a.head = -1
 				a.chew = 0.0
 				t = -1
@@ -825,6 +828,9 @@ function SimAttacks.install(C: any)
 				end
 				if readi32(owner, t * 4) ~= tg or readu8(land, t) == 0 or not touches(self, t, at) then
 					continue
+				end
+				if has_gar and self:garrison_holds(t) then
+					continue -- (a garrison's own tile holds while it does: SimGarrisons)
 				end
 				-- _add_neighbors(tile) runs before the tile changes hands.
 				_add_neighbors(self, a, t)
@@ -843,9 +849,12 @@ function SimAttacks.install(C: any)
 				mag *= fo_mod
 				tc *= fo_mod
 			end
+			local g = if has_gar then self:garrison_covering(t, tg) else nil
 			local loss: number
 			local tf: number
 			local dloss = 0.0
+			-- what a full-size tile costs the garrison guarding it
+			local gloss = 0.0
 			if neutral then
 				loss = mag * nl
 				local v = Rules.TERRA_NULLIUS_COST_SCALE * tc / a.troops
@@ -858,13 +867,27 @@ function SimAttacks.install(C: any)
 			else
 				local dtroops = o_troops[tg]
 				dloss = dtroops / math.max(o_tiles[tg] * K_AREA, 1.0)
+				local gmag = 1.0
+				local gcost = 1.0
+				if g ~= nil then
+					-- held by the reserve and the garrison; a defense post's bonus, scaled by how much the
+					-- garrison outnumbers the attack and how concentrated it is
+					dtroops += g.troops
+					local share = math.clamp(g.troops / math.max(a.troops, 1.0), 0.0, 2.0) * 0.5
+					local sg = share * g.conc
+					gmag = 1.0 + (Rules.GARRISON_MAG - 1.0) * sg
+					gcost = 1.0 + (Rules.GARRISON_COST - 1.0) * sg
+				end
 				local ratio = dtroops / a.troops
 				local cl = if ratio < 0.6 then 0.6 elseif ratio > 2.0 then 2.0 else ratio
-				loss = mag * mag_k * trait_l * cl * (bonus_l + Rules.ATTACKER_LOSS_PER_DENSITY * dloss)
+				loss = mag * gmag * mag_k * trait_l * cl * (bonus_l + Rules.ATTACKER_LOSS_PER_DENSITY * dloss)
 				local c1 = if ratio < 0.82 then 0.82 elseif ratio > 7.5 then 7.5 else ratio
 				local r20 = ratio / 20.0
 				local c2 = if r20 < 1.0 then 1.0 elseif r20 > 50.0 then 50.0 else r20
-				tf = c1 * c2 * tc * bonus_s * trait_s
+				tf = c1 * c2 * tc * gcost * bonus_s * trait_s
+				if g ~= nil then
+					gloss = loss / Rules.GARRISON_TRADE
+				end
 			end
 			if tf < 1e-6 then
 				tf = 1e-6
@@ -885,6 +908,12 @@ function SimAttacks.install(C: any)
 					local dl = math.min(need * dfloor, math.max(o_troops[tg], 0.0))
 					dbg_flow[tg * 5 + 2] += dl
 					o_troops[tg] -= dl
+					if g ~= nil then
+						local gl = math.min(need * gloss, g.troops)
+						dbg_flow[tg * 5 + 2] += gl
+						g.troops -= gl
+						self._gar_dirty = math.max(self._gar_dirty, 1)
+					end
 				end
 				a.chew = 0.0
 				a.head = -1
@@ -894,7 +923,7 @@ function SimAttacks.install(C: any)
 				if
 					not neutral
 					and o_tiles[tg] * K_AREA < Rules.ANNEX_BELOW_FULL_TILES
-					and (o_kind[tg] ~= Defs.KIND_HUMAN or a.troops > o_troops[tg])
+					and (o_kind[tg] ~= Defs.KIND_HUMAN or a.troops > o_troops[tg] + self:garrison_total(tg))
 				then
 					-- (a person's small nation only once the attack outnumbers its army at home)
 					self:_annex(tg, at)
@@ -908,6 +937,12 @@ function SimAttacks.install(C: any)
 					local dl2 = math.min(can * dfloor, math.max(o_troops[tg], 0.0))
 					dbg_flow[tg * 5 + 2] += dl2
 					o_troops[tg] -= dl2
+					if g ~= nil then
+						local gl2 = math.min(can * gloss, g.troops)
+						dbg_flow[tg * 5 + 2] += gl2
+						g.troops -= gl2
+						self._gar_dirty = math.max(self._gar_dirty, 1)
+					end
 				end
 				a.chew += can
 			end

@@ -41,6 +41,7 @@ local SIGNALS = {
 	"owner_eliminated", -- (id, killer)
 	"conquest", -- (conqueror, conquered, gold) Ev.CONQUEST: the gold the conqueror took
 	"reinforced", -- (owner, troops, ready_tick) the Arsenal's Reinforcements arrived
+	"garrisons_changed", -- () the garrison list was replaced (Ev.GARRISONS, or a snapshot)
 	"bonus", -- (owner, tile, gold) Ev.BONUS: gold earned at a tile (a train's stop)
 	"owner_spawned", -- (id, tile)
 	"structure_added", -- (sid)
@@ -158,6 +159,14 @@ export type NukeInfo = {
 	launch_tick: number,
 	flight_ticks: number,
 }
+export type GarrisonInfo = {
+	gid: number,
+	owner: number,
+	tile: number,
+	troops: number,
+	pending: number,
+	ready_tick: number,
+}
 --- retreating: a retreat was ordered (the attack is frozen until its troops come home).
 export type AttackInfo = {
 	aid: number,
@@ -219,6 +228,9 @@ function GameState.new(world: any?)
 	self.nukes = {} :: { [number]: NukeInfo }
 	--- owner id -> the tick its next Reinforcements call is ready (Ev.REINFORCE; absent: now)
 	self.reinforce_ready = {} :: { [number]: number }
+	--- Garrisons (Core/SimGarrisons) by gid: { gid, owner, tile, troops, pending, ready_tick } (ready_tick
+	--- 0 when nothing is on its way). Replaced whole by each Ev.GARRISONS.
+	self.garrisons = {} :: { [number]: GarrisonInfo }
 	self.attacks = {} :: { [number]: AttackInfo }
 	--- key = min(a,b) * 1024 + max(a,b)
 	self.alliances = {} :: { [number]: boolean }
@@ -498,14 +510,28 @@ function GameState.set_map(self: GameState, map: any)
 	self.fallout_count = 0
 end
 
---- Owner id of tile `i` (0 = unowned / out of range).
+--- Owner id of tile `i` as the local player knows it (0 = unowned / out of range / out of sight: under
+--- the fog of war, Core/FogOfWar, a tile nobody on the player's side can see reads as nobody's). The
+--- interface goes through this; true_owner is the real one.
 function GameState.tile_owner(self: GameState, i: number): number
 	if i >= 0 and i < self.N then
+		local fog = (self :: any).fog
+		if fog ~= nil and fog.active and not fog:visible(i) then
+			return 0
+		end
 		return buffer.readi32(self.owner, i * 4)
 	end
 	return 0
 end
 GameState.owner_of = GameState.tile_owner
+
+--- Owner id of tile `i`, whether the local player can see it or not.
+function GameState.true_owner(self: GameState, i: number): number
+	if i >= 0 and i < self.N then
+		return buffer.readi32(self.owner, i * 4)
+	end
+	return 0
+end
 
 function GameState.tile_flags(self: GameState, i: number): number
 	if i >= 0 and i < self.N then
@@ -928,6 +954,7 @@ function GameState.load_snapshot(self: GameState, snap: { [string]: any })
 	for _, row in snap.attacks or {} do
 		self:_set_attack(row, 0)
 	end
+	self:_set_garrisons(snap.garrisons, false)
 	for _, row in snap.allies or {} do
 		self:_set_alliance(row[1], row[2], true)
 		local key = math.min(row[1], row[2]) * 1024 + math.max(row[1], row[2])
@@ -1098,6 +1125,70 @@ end
 
 HANDLERS[Ev.BONUS] = function(self, e)
 	self.bonus:Fire(e[2], e[3], e[4])
+end
+
+--- Replaces the garrison list with `rows` (flat: gid, owner, tile, troops, pending, ready_tick).
+function GameState._set_garrisons(self: any, rows: any, fire: boolean?)
+	local g = self.garrisons
+	table.clear(g)
+	if type(rows) == "table" then
+		for i = 1, #rows - 5, 6 do
+			local gid = tonumber(rows[i])
+			if gid ~= nil then
+				g[gid] = {
+					gid = gid,
+					owner = tonumber(rows[i + 1]) or 0,
+					tile = tonumber(rows[i + 2]) or 0,
+					troops = tonumber(rows[i + 3]) or 0,
+					pending = tonumber(rows[i + 4]) or 0,
+					ready_tick = tonumber(rows[i + 5]) or 0,
+				}
+			end
+		end
+	end
+	if fire ~= false then
+		self.garrisons_changed:Fire()
+	end
+end
+
+HANDLERS[Ev.GARRISONS] = function(self, e)
+	self:_set_garrisons(e[2], true)
+end
+
+--- Troops in owner `id`'s garrisons (arrived and on their way).
+function GameState.garrison_total(self: any, id: number): number
+	local n = 0
+	for _, g in self.garrisons do
+		if g.owner == id then
+			n += g.troops + g.pending
+		end
+	end
+	return n
+end
+
+--- Owner `id`'s garrison nearest tile `t` within `range` tiles (euclidean), or nil. `ready`: only one
+--- whose troops have arrived (the ones that defend and launch attacks).
+function GameState.garrison_near(self: any, id: number, t: number, range: number, ready: boolean?): GarrisonInfo?
+	local d2 = self.map.range_d2
+	local best: GarrisonInfo? = nil
+	local bd = range * range
+	for _, g in self.garrisons do
+		if g.owner == id and (not ready or g.troops >= 1) then
+			local d = d2(g.tile, t)
+			if d <= bd then
+				best = g
+				bd = d
+			end
+		end
+	end
+	return best
+end
+
+--- Owner `id`'s whole army at home: reserve plus garrisons.
+function GameState.army(self: any, id: number): number
+	local o = self.owners[id]
+	local r = if o ~= nil then (tonumber(o.troops) or 0) else 0
+	return r + self:garrison_total(id)
 end
 
 --- The Arsenal's Reinforcements arrived for owner e[2]: when its next call is ready.

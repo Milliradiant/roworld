@@ -470,6 +470,23 @@ function RoadLayer.tick(self: any, dt: number)
 	end
 	local cam = self.view.rig
 	self._recolor -= dt
+	-- the fog of war (Core/FogOfWar): rails out of sight aren't drawn; when sight changes, draw again
+	local fog = st.fog
+	local fog_v = if fog ~= nil then fog.version else 0
+	if fog_v ~= self._fog_v then
+		self._fog_v = fog_v
+		self._dirty = true
+	end
+	local fog_on = fog ~= nil and fog.active
+	local FW, FH = st.W or 1, st.H or 1
+	local function out_of_sight(u: number, v: number): boolean
+		if not fog_on then
+			return false
+		end
+		local x = math.clamp(math.floor(u), 0, FW - 1)
+		local y = math.clamp(math.floor(v), 0, FH - 1)
+		return not fog:visible(y * FW + x)
+	end
 	if not self._dirty and cam.version == self._cam_version and self._recolor > 0 then
 		return
 	end
@@ -556,6 +573,9 @@ function RoadLayer.tick(self: any, dt: number)
 					if mx < -mw or my < -mh or mx > vw + mw or my > vh + mh then
 						continue
 					end
+					if out_of_sight(pc.mu, pc.mv) then
+						continue
+					end
 					local col = colour(st, pc, recolor, me, mine, border)
 					drawn += 1
 					local j, fresh = acquire(track, pc, pass)
@@ -622,6 +642,9 @@ function RoadLayer.tick(self: any, dt: number)
 				local mx, my = ax + (run.mu - cu) * s, ay + (run.mv - cv) * s
 				local m = len * 0.5 + thick + slack
 				if mx < -m or my < -m or mx > vw + m or my > vh + m then
+					continue
+				end
+				if out_of_sight(run.mu, run.mv) then
 					continue
 				end
 				local col = colour(st, run, recolor, me, mine, border)

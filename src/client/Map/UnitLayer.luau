@@ -444,11 +444,24 @@ end
 -- Frame
 -- ---------------------------------------------------------------------------------------------
 
+--- Whether map point (u, v) is in the local player's sight (Core/FogOfWar; always while it is off).
+local function seen_uv(fog: any, W: number, H: number, u: number, v: number): boolean
+	if fog == nil or not fog.active then
+		return true
+	end
+	local x = math.clamp(math.floor(u), 0, W - 1)
+	local y = math.clamp(math.floor(v), 0, H - 1)
+	return fog:visible(y * W + x)
+end
+
 function UnitLayer.tick(self: any, _dt: number)
 	local st = self._state
 	if st == nil then
 		return
 	end
+	local fog = st.fog
+	local FW = (st.map and st.map.W) or Defs.W
+	local FH = (st.map and st.map.H) or Defs.H
 	local cam = self.view.rig
 	local rt = st.render_tick or st.tick or 0
 	local k = tonumber(st.map and st.map.k_lin) or Rules.K_LIN
@@ -506,6 +519,9 @@ function UnitLayer.tick(self: any, _dt: number)
 		local route = w.route
 		local ux, uy, seg = WakeRoute.at(route, UnitLayer.path_done(u, rt))
 		w.x, w.y = ux, uy
+		if not seen_uv(fog, FW, FH, ux, uy) then
+			continue -- (out of sight: no wake either)
+		end
 		local c = st:owner_color(u.owner)
 		local xs, ys = route.xs, route.ys
 		local sx0, sy0 = cam:map_to_screen(xs[1], ys[1])
@@ -533,6 +549,18 @@ function UnitLayer.tick(self: any, _dt: number)
 			continue
 		end
 		local pick = kind == U_TRANSPORT or kind == U_WARSHIP
+		-- (out of the player's sight: not drawn)
+		local wk = if kind == U_TRANSPORT then self._wakes[uid] else nil
+		if wk ~= nil then
+			if not seen_uv(fog, FW, FH, wk.x, wk.y) then
+				continue
+			end
+		elseif fog ~= nil and fog.active then
+			local fu, fv = UnitLayer.unit_uv(st, u, rt)
+			if not seen_uv(fog, FW, FH, fu, fv) then
+				continue
+			end
+		end
 		if kind == U_TRUCK and cars_shown then
 			-- the cars behind the engine, back to front (the engine is drawn last, on top)
 			local done = UnitLayer.path_done(u, rt)
@@ -571,6 +599,14 @@ function UnitLayer.tick(self: any, _dt: number)
 		local t = math.clamp((rt - n.launch_tick) / math.max(n.flight_ticks, 1), 0, 1)
 		local col = NUKE_COL[n.kind] or COL_ATOM
 		local npx = px * (NUKE_SCALE[n.kind] or 1)
+		if fog ~= nil and fog.active then
+			-- (out of sight while it flies out of sight; its target ring shows where the target can be
+			-- seen, the player's own land always)
+			local nu, nv = UnitLayer.nuke_uv(st, n, t)
+			if not seen_uv(fog, FW, FH, nu, nv) and not fog:visible(n.to_tile) then
+				continue
+			end
+		end
 		if NUKE_PLAIN[n.kind] then
 			local sx0, sy0 = cam:map_to_screen(UnitLayer.nuke_uv(st, n, t))
 			if cam:on_screen(sx0, sy0, npx) then
@@ -657,8 +693,9 @@ function UnitLayer.tick(self: any, _dt: number)
 		local t = math.clamp((rt - sh.fire_tick) / math.max(sh.impact_tick - sh.fire_tick, 1), 0, 1)
 		local ax, ay = centre(sh.from_tile, W)
 		local bx, by = UnitLayer.unit_uv(st, target, sh.impact_tick)
-		local x, y = cam:map_to_screen(ax + (bx - ax) * t, ay + (by - ay) * t)
-		if cam:on_screen(x, y, px) then
+		local mu, mv = ax + (bx - ax) * t, ay + (by - ay) * t
+		local x, y = cam:map_to_screen(mu, mv)
+		if cam:on_screen(x, y, px) and seen_uv(fog, FW, FH, mu, mv) then
 			local owner = if sh.shooter_kind == 0 and st.units[sh.shooter_id]
 				then st.units[sh.shooter_id].owner
 				else st:tile_owner(sh.from_tile)
@@ -676,8 +713,9 @@ function UnitLayer.tick(self: any, _dt: number)
 		local ax, ay = centre(sam.tile, W)
 		local ti = math.clamp((m.intercept_tick - n.launch_tick) / math.max(n.flight_ticks, 1), 0, 1)
 		local bx, by = UnitLayer.nuke_uv(st, n, ti)
-		local x, y = cam:map_to_screen(ax + (bx - ax) * t, ay + (by - ay) * t)
-		if cam:on_screen(x, y, px) then
+		local mu, mv = ax + (bx - ax) * t, ay + (by - ay) * t
+		local x, y = cam:map_to_screen(mu, mv)
+		if cam:on_screen(x, y, px) and seen_uv(fog, FW, FH, mu, mv) then
 			self:_sprite(nuke_uid * 16 + KEY_SAM, COL_SAM, sam.owner, x, y, px, seen)
 		end
 	end

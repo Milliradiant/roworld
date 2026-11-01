@@ -692,6 +692,14 @@ function RadialMenu._redraw(self: any)
 					Th.fmt_troops(it2.troops),
 					math.floor(self.ctx.ratio * 100 + 0.5)
 				)
+		elseif it2.id == "station" and it2.troops ~= nil then
+			sub = string.format(
+				"%s troops of your reserve (%d%%)",
+				Th.fmt_troops(it2.troops),
+				math.floor(self.ctx.ratio * 100 + 0.5)
+			)
+		elseif it2.id == "disband" then
+			sub = "its troops rejoin your reserve"
 		elseif it2.id == "attack" or it2.id == "boat" or it2.id == "donate" then
 			sub = string.format(
 				"%s troops (%d%%)",

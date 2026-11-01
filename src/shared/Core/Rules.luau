@@ -209,6 +209,53 @@ local function build(K_LIN: number): any
 	Rules.DEFENSE_POST_COST = 3.0
 	--- Integer radius of the defense-post coverage map (ceil of defense_range()).
 	Rules.DEFENSE_RADIUS = math.ceil(30.0 / K_LIN)
+
+	-- ---------------------------------------------------------------------------------------------
+	-- Garrisons (Core/SimGarrisons): troops stationed at a spot instead of spread over the land
+	-- ---------------------------------------------------------------------------------------------
+	--- Garrisons a nation may hold at once.
+	Rules.GARRISON_MAX = 5
+	--- A station order's troops arrive (and start to defend) this many ticks after it.
+	Rules.GARRISON_FORM_TICKS = 50
+	--- A garrison guards its owner's land within this many full-size tiles of it.
+	Rules.GARRISON_RANGE_FULL = 20.0
+	--- An attack ordered within REACH x range of a garrison is launched from it; a station order
+	--- within MERGE x range of one reinforces it.
+	Rules.GARRISON_REACH = 1.5
+	Rules.GARRISON_MERGE = 0.6
+	--- A new garrison stands up to SNAP x range from where it was ordered, on the tile deepest inside
+	--- its nation's land (no other land within GARRISON_SITE_DEPTH tiles, if it can): not on the edge.
+	Rules.GARRISON_SNAP = 0.3
+	Rules.GARRISON_SITE_DEPTH = 3
+	--- At full strength (the garrison has twice the attacking troops and guards at most a quarter of
+	--- its nation's border) a guarded tile multiplies the attacker's losses (mag) by GARRISON_MAG and the
+	--- time it takes (tileCost) by GARRISON_COST, like a defense post. Each full-size tile taken costs
+	--- the garrison 1 / GARRISON_TRADE of what it cost the attacker.
+	Rules.GARRISON_MAG = 4.0
+	Rules.GARRISON_COST = 3.0
+	Rules.GARRISON_TRADE = 4.0
+	--- Concentration: a garrison guarding all of its nation's border gets no bonus, one guarding
+	--- 1 / GARRISON_CONC_FULL of it or less the full bonus (no free bonus for a small nation covered whole).
+	Rules.GARRISON_CONC_FULL = 4.0
+	--- A garrison whose tile is taken falls back home with this share of its troops.
+	Rules.GARRISON_OVERRUN_KEEP = 0.5
+	--- How often (ticks) a garrison recounts the border it guards, and clients hear its troops.
+	Rules.GARRISON_COVER_TICKS = 20
+	Rules.GARRISON_UPDATE_TICKS = 5
+
+	-- ---------------------------------------------------------------------------------------------
+	-- Fog of war (Core/FogOfWar, client side): always on in this fork
+	-- ---------------------------------------------------------------------------------------------
+	Rules.FOG_OF_WAR = true
+	--- A player sees this far (full-size tiles) past their own and their allies' land, and their
+	--- warships and transports this far around them.
+	Rules.FOG_SIGHT_FULL = 48.0
+	Rules.FOG_SHIP_SIGHT_FULL = 32.0
+
+	--- Garrison guard radius in OUR tiles (euclidean, map.range_d2).
+	function Rules.garrison_range(): number
+		return Rules.GARRISON_RANGE_FULL / K_LIN
+	end
 	--- SAMCooldown / SiloCooldown: 90 ticks per missile; a SAM or silo holds `level` missiles.
 	Rules.SAM_COOLDOWN_TICKS = 90
 	Rules.SILO_COOLDOWN_TICKS = 90

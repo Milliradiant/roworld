@@ -45,7 +45,10 @@ Ev.REINFORCE = 33 -- id, troops, ready_tick  (Reinforcements arrived; the next c
 Ev.BONUS = 34 -- owner, tile, gold  (gold `owner` earned at `tile`, a train's
 --   stop at a station. Only for a person, and sent to that person alone)
 
+Ev.GARRISONS = 35 -- rows  (every garrison, flat: gid, owner, tile, troops, pending, ready_tick per
+--   garrison; Core/SimGarrisons. Replaces the list the client had)
+
 --- Number of event ids (ids are 0..COUNT-1).
-Ev.COUNT = 35
+Ev.COUNT = 36
 
 return Ev

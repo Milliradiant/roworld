@@ -18,7 +18,9 @@
 --     by one tile (Chebyshev 1). The fill only for an owner of HOVER_FILL_MAX tiles or fewer: it
 --     means repainting every tile (see HOVER_FILL_MAX);
 --   * a border next to an ally is mixed 35% toward green;
---   * defended tiles (near a same-owner defense post): border checkerboard x0.7, fill x0.85.
+--   * defended tiles (near a same-owner defense post): border checkerboard x0.7, fill x0.85;
+--   * the fog of war (Core/FogOfWar, set_fog): a tile out of the player's sight is the bare terrain,
+--     darkened (FOG_DIM), whoever owns it.
 -- (Lune tests load this file with the shared modules from the repo.)
 local IS_ROBLOX = (game :: any) ~= nil
 local AssetService = if IS_ROBLOX then game:GetService("AssetService") else nil :: any
@@ -616,6 +618,44 @@ function MapSurface.unbind(self: MapSurface)
 	self._flags = nil
 end
 
+--- The fog of war to draw (Core/FogOfWar; nil: none).
+function MapSurface.set_fog(self: any, fog: any)
+	self._fog = fog
+end
+
+--- FogOfWar.changed: the cells whose sight flipped (nil: all of them) are painted again.
+function MapSurface.on_fog_changed(self: any, cells: { number }?)
+	if self._own == nil or not self.ready then
+		return
+	end
+	local fog = self._fog
+	if cells == nil or fog == nil or #cells * fog.C * fog.C > self.N // 4 then
+		self:rebuild_all()
+		return
+	end
+	local queue, queued = self._queue, self._queued
+	local n = self._queue_n
+	local W, H = self.W, self.H
+	local C, CW = fog.C, fog.CW
+	for _, c in cells do
+		local x0 = (c % CW) * C
+		local y0 = (c // CW) * C
+		-- (a tile next to the cell too: a border tile's look depends on its neighbours)
+		for y = math.max(0, y0 - 1), math.min(H - 1, y0 + C) do
+			local row = y * W
+			for x = math.max(0, x0 - 1), math.min(W - 1, x0 + C) do
+				local t = row + x
+				if readu8(queued, t) == 0 then
+					writeu8(queued, t, 1)
+					n += 1
+					queue[n] = t
+				end
+			end
+		end
+	end
+	self._queue_n = n
+end
+
 --- Territory skins (Data/Cosmetics): owner → { mask, w, h, scale, skin, fill2, fill2_hi }. `ids`: the
 --- owners to (re)load (nil: every owner with cosmetics). Colours follow in refresh_palette.
 function MapSurface._load_skins(self: any, ids: { number }?)
@@ -819,8 +859,33 @@ function MapSurface.tile_pixel(self: MapSurface, i: number): number
 	return c
 end
 
+--- A terrain pixel under the fog of war: darkened, a little cooler.
+local function fog_pixel(t: number): number
+	local r = t % 256
+	local g = (t // 256) % 256
+	local b = (t // 65536) % 256
+	return math.floor(r * 0.40) + math.floor(g * 0.43) * 256 + math.floor(b * 0.52) * 65536 + 4278190080
+end
+MapSurface.fog_pixel = fog_pixel
+
+--- True when tile i lies in the fog (out of the player's sight).
+local function fogged(self: MapSurface, i: number): boolean
+	local fog = (self :: any)._fog
+	if fog == nil or not fog.active then
+		return false
+	end
+	local W = self.W
+	local x = i % W
+	local C = fog.C
+	return readu8(fog.vis, ((i - x) // W // C) * fog.CW + x // C) == 0
+end
+
 --- Composite tile i (terrain under its overlay) into the image buffer.
 local function composite(self: MapSurface, i: number)
+	if fogged(self, i) then
+		writeu32(self.comp, i * 4, fog_pixel(readu32(self.terrain, i * 4)))
+		return
+	end
 	local over = self:tile_pixel(i)
 	local a = over // 16777216
 	local k = i * 4
@@ -878,6 +943,11 @@ local function paint_queue(self: MapSurface, head: number, last: number)
 		alliances = nil
 	end
 	local tiles, tw, th, cols = self.tiles, self.tile_w, self.tile_h, self.cols
+	-- the fog of war: a cell grid (Core/FogOfWar), nil while it is off
+	local fog = (self :: any)._fog
+	local fvis = if fog ~= nil and fog.active then fog.vis else nil
+	local fC = if fog ~= nil then fog.C else 1
+	local fCW = if fog ~= nil then fog.CW else 1
 	for q = head, last do
 		local i = queue[q]
 		writeu8(queued, i, 0)
@@ -885,7 +955,9 @@ local function paint_queue(self: MapSurface, head: number, last: number)
 		local o = readi32(own, k)
 		local x = i % W
 		local y = i // W
-		if (fallout and band(readu8(flags, i), F_FALLOUT) ~= 0) or o >= MAX_OWNERS or (o > 0 and skins[o] ~= nil) then
+		if fvis ~= nil and readu8(fvis, (y // fC) * fCW + x // fC) == 0 then
+			writeu32(comp, k, fog_pixel(readu32(terrain, k)))
+		elseif (fallout and band(readu8(flags, i), F_FALLOUT) ~= 0) or o >= MAX_OWNERS or (o > 0 and skins[o] ~= nil) then
 			composite(self, i)
 		elseif o <= 0 then
 			writeu32(comp, k, readu32(terrain, k))

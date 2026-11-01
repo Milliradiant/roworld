@@ -227,6 +227,7 @@ function MapView.new(): MapView
 			{ "ranges", "RangeLayer", overlay },
 			{ "structures", "StructureLayer", overlay },
 			{ "units", "UnitLayer", moving },
+			{ "garrisons", "GarrisonLayer", moving },
 			{ "fx", "FxLayer", moving },
 			{ "labels", "NameLayer", labels },
 			{ "fronts", "FrontLayer", labels },
@@ -413,6 +414,28 @@ function MapView.bind_state(self: any, state: any)
 			call(self.layers.fx, "bonus", tile, gold)
 		end
 	end)
+	-- the fog of war (Core/FogOfWar): the surface draws bare terrain where the player can't see, and
+	-- the layers read state.fog
+	local okf, FogOfWar = pcall(function()
+		return require(Core:WaitForChild("FogOfWar"))
+	end)
+	if okf and FogOfWar ~= nil then
+		local okn, fog = pcall(FogOfWar.new, state)
+		if okn and fog ~= nil then
+			self._fog = fog
+			surface:set_fog(fog)
+			table.insert(
+				self._conns,
+				fog.changed:Connect(function(cells)
+					guard("fog", surface.on_fog_changed, surface, cells)
+				end)
+			)
+			-- (counted now, from the state as it stands; tiles_changed keeps it current)
+			fog:_start_scan()
+		else
+			report("FogOfWar.new", fog)
+		end
+	end
 	surface:bind(state)
 	if state.map ~= nil and state.map ~= self._map then
 		task.spawn(function()
@@ -434,6 +457,11 @@ function MapView.unbind(self: any, _rebinding: boolean?)
 		return
 	end
 	self._state = nil
+	if self._fog ~= nil then
+		pcall(self._fog.destroy, self._fog)
+		self._fog = nil
+	end
+	self.surface:set_fog(nil)
 	self.surface:unbind()
 	for _, name in self._layer_order do
 		call(self.layers[name], "unbind")
@@ -714,6 +742,12 @@ function MapView._on_tile_hovered(self: any, tile: number)
 	call(self.layers.ranges, "set_hover_tile", tile, 14.0 / self.rig.scale)
 end
 
+--- True when tile `t` lies out of the local player's sight (Core/FogOfWar).
+function MapView.fogged(self: any, t: number): boolean
+	local fog = self._fog
+	return fog ~= nil and fog.active and not fog:visible(t)
+end
+
 function MapView._on_nuke_detonated(self: any, uid: number, kind: number, tile: number, radius: number)
 	local fx = self.layers.fx
 	if fx == nil then
@@ -728,6 +762,9 @@ function MapView._on_nuke_detonated(self: any, uid: number, kind: number, tile: 
 			local t = math.clamp(((st.render_tick or st.tick) - n.launch_tick) / math.max(n.flight_ticks, 1), 0, 1)
 			local u, v = units.nuke_uv(st, n, t)
 			local W = st.map.W or Defs.W
+			if self:fogged(math.floor(v) * W + math.floor(u)) then
+				return
+			end
 			call(fx, "pop", math.floor(v) * W + math.floor(u), Color3.new(1, 0.85, 0.5))
 			call(fx, "burst", "sam", u, v)
 			return
@@ -736,6 +773,9 @@ function MapView._on_nuke_detonated(self: any, uid: number, kind: number, tile: 
 		local W = if st ~= nil then st.map.W or Defs.W else Defs.W
 		call(fx, "burst", "sam", tile % W + 0.5, tile // W + 0.5)
 		return
+	end
+	if self:fogged(tile) then
+		return -- (a blast out of sight isn't seen)
 	end
 	call(fx, "nuke", kind, tile, radius)
 end
@@ -780,7 +820,10 @@ function MapView._on_unit_removed(self: any, uid: number, reason: number)
 		if u ~= nil and units ~= nil and u.path and #u.path > 0 then
 			local x, y = units.unit_uv(st, u, st.render_tick or st.tick)
 			local W = st.map.W or Defs.W
-			call(self.layers.fx, "pop", math.floor(y) * W + math.floor(x))
+			local ut = math.floor(y) * W + math.floor(x)
+			if not self:fogged(ut) then
+				call(self.layers.fx, "pop", ut)
+			end
 		end
 	end
 	if uid == self._selected_unit then
@@ -922,6 +965,9 @@ function MapView.update(self: any, dt: number)
 	local st = self._state
 	if st ~= nil then
 		guard("local_owner", local_owner_step, self, st)
+	end
+	if self._fog ~= nil then
+		guard("fog.update", self._fog.update, self._fog, dt)
 	end
 	local t1 = clock()
 	local want = self._surface_hover_want

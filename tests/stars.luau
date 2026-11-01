@@ -9,6 +9,8 @@ local Stars = require("../src/shared/Data/Stars")
 local Arsenal = require("../src/shared/Data/Arsenal")
 local Products = require("../src/shared/Data/Products")
 local Purchases = require("../src/server/Purchases")
+-- (the paid paths, as upstream sells them: this fork turns them off with FREE_FOR_ALL)
+Purchases.FREE_FOR_ALL = false
 local Rewards = require("../src/server/Rewards")
 
 local function line(p, key)
