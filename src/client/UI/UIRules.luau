@@ -1302,32 +1302,6 @@ function UIRules.radial_items(self: any, tile: number): { { [string]: any } }
 	end
 
 	if playing and own == me then
-		-- garrisons (Core/SimGarrisons): station the attack share of the reserve here, or send the one
-		-- nearby home
-		local plan = self:station_plan(tile)
-		table.insert(items, {
-			id = "station",
-			label = if plan.merge ~= nil then "Reinforce" else "Station",
-			icon = "troops",
-			ok = plan.ok,
-			reason = plan.reason,
-			danger = false,
-			troops = plan.troops,
-		})
-		if plan.merge ~= nil then
-			table.insert(items, {
-				id = "disband",
-				label = "Disband",
-				icon = "retreat",
-				ok = true,
-				reason = "",
-				danger = false,
-				gid = plan.merge.gid,
-			})
-		end
-	end
-
-	if playing and own == me then
 		local sub = {}
 		-- (the Arsenal's structures the player has unlocked come after the others)
 		local build_kinds = table.clone(UIRules.BUILD_KINDS)
@@ -1357,6 +1331,32 @@ function UIRules.radial_items(self: any, tile: number): { { [string]: any } }
 			items,
 			{ id = "build", label = "Build", icon = "city", ok = true, reason = "", danger = false, sub = sub }
 		)
+	end
+
+	if playing and own == me then
+		-- garrisons (Core/SimGarrisons): station the attack share of the reserve here, or send the one
+		-- nearby home
+		local plan = self:station_plan(tile)
+		table.insert(items, {
+			id = "station",
+			label = if plan.merge ~= nil then "Reinforce" else "Station",
+			icon = "troops",
+			ok = plan.ok,
+			reason = plan.reason,
+			danger = false,
+			troops = plan.troops,
+		})
+		if plan.merge ~= nil then
+			table.insert(items, {
+				id = "disband",
+				label = "Disband",
+				icon = "retreat",
+				ok = true,
+				reason = "",
+				danger = false,
+				gid = plan.merge.gid,
+			})
+		end
 	end
 
 	-- what can be launched at the tile: the bombs with a silo, and the Arsenal's munitions the player
