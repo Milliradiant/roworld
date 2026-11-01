@@ -1119,6 +1119,11 @@ function UIRules._primary(self: any, tile: number): { [string]: any }
 		out.reason = if ctx:terrain_at(tile) == Defs.T_ICECAP then "Antarctica cannot be claimed" else ""
 		return out
 	end
+	if s.fog ~= nil and not s.fog:visible(tile) then
+		-- (the fog of war, Core/FogOfWar: no order into land nobody on the player's side can see)
+		out.reason = "Out of sight: scout it first"
+		return out
+	end
 	-- Fallout stays until the land is conquered again; taking it is slow and costly.
 	local fallout = own == 0 and s:has_fallout(tile)
 	local share = ctx:order_ratio()
@@ -1266,8 +1271,17 @@ function UIRules.radial_items(self: any, tile: number): { { [string]: any } }
 		local p = self:primary(tile)
 		local is_boat = tostring(p.type) == "boat"
 		local verb = if own == 0 then "Expand" else "Attack"
-		local atk =
-			{ id = "attack", label = verb, icon = "attack", ok = p.ok and not is_boat, reason = "", danger = false }
+		local atk = {
+			id = "attack",
+			label = verb,
+			icon = "attack",
+			ok = p.ok and not is_boat,
+			reason = "",
+			danger = false,
+			-- (launched from a garrison: its share of that garrison, SimGarrisons)
+			garrison = p.garrison,
+			troops = if p.garrison ~= nil then p.troops else nil,
+		}
 		if is_boat then
 			atk.reason = "No land border: send a boat"
 		elseif not p.ok then
@@ -1275,7 +1289,9 @@ function UIRules.radial_items(self: any, tile: number): { { [string]: any } }
 		end
 		table.insert(items, atk)
 		local boat = { id = "boat", label = "Boat", icon = "boat", ok = false, reason = "", danger = false }
-		if self:boat_landing(tile) < 0 then
+		if s.fog ~= nil and not s.fog:visible(tile) then
+			boat.reason = "Out of sight: scout it first"
+		elseif self:boat_landing(tile) < 0 then
 			boat.reason = if s.map:is_coastal(tile)
 				then "None of your coasts reach it"
 				else "No coast of theirs within reach"

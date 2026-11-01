@@ -264,16 +264,18 @@ function SimArsenal.install(C)
 		local dbg_flow = self.dbg_flow
 		local tick = self.tick
 		for _, o in order do
-			local troops = o_troops[o]
+			-- (the army at home: the reserve and its garrisons, SimGarrisons, lose the same share)
+			local reserve = o_troops[o]
+			local troops = reserve + self:garrison_total(o)
 			local kill = Rules.strike_kill(kind, troops, hit[o] * R.K_AREA)
 			if kill <= 0 then
 				continue
 			end
 			local keep = 1.0 - kill / math.max(troops, 1.0)
 			dbg_flow[o * 5 + 3] += kill
-			o_troops[o] = troops - kill
+			o_troops[o] = if troops == reserve then troops - kill else reserve * keep
+			self:_scale_garrisons(o, keep)
 			if kind ~= N_SHELL then
-				self:_scale_garrisons(o, keep)
 				-- the same share of its armies in the field and at sea
 				for _, a in self.attacks do
 					if not a.dead and a.attacker == o then

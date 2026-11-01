@@ -138,6 +138,26 @@ end
 expect(fog:visible(sim.o_spawn_tile[b]), "an ally's land is in sight")
 expect(fog:owner_seen(b), "and the ally counts as seen")
 
+-- a fresh fog (a resync, a takeover) never shows the whole map while it counts
+do
+	local st2 = GameState.new(map)
+	st2:load_snapshot(sim:snapshot())
+	st2.local_owner = a
+	local fog2 = FogOfWar.new(st2)
+	fog2:_start_scan()
+	fog2:update(0.016)
+	expect(fog2.active and not fog2:visible(sim.o_spawn_tile[b]), "while the first count runs, nothing far away shows")
+	for _ = 1, 20 do
+		fog2:update(0.1)
+	end
+	expect(fog2:visible(sim.o_spawn_tile[a]), "once counted, the player's land shows")
+	-- a player knocked out who keeps watching sees everything
+	st2.owners[a].alive = false
+	fog2:update(0.1)
+	expect(not fog2.active and fog2:visible(sim.o_spawn_tile[b]), "a player who is out watches without fog")
+	fog2:destroy()
+end
+
 -- spectators see everything
 st.local_owner = 0
 tick(2)

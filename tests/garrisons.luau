@@ -307,6 +307,7 @@ do
 	g.troops = cap * 1.2
 	run(sim, 30)
 	expect(sim.o_troops[a] >= 0 and sim.o_troops[a] < 1, "over the cap the reserve doesn't grow (" .. sim.o_troops[a] .. ")")
+	expect(g.troops < cap * 1.2 and g.troops >= sim.o_cap[a] - 1, "and the garrison shrinks back to the cap (" .. math.floor(g.troops) .. ")")
 	g.troops = cap * 0.2
 	local r0 = sim.o_troops[a]
 	run(sim, 30)
@@ -391,6 +392,55 @@ do
 		"half of it falls back to the reserve"
 	)
 	expect(has(msgs_b, "overran your garrison") and has(msgs_a, "You overran"), "both sides are told")
+end
+
+-- a garrison stands inland, and holds against a boat landing on it
+do
+	local sim, a, b = neighbours_match(40, 60)
+	sim:end_attacks_of(a)
+	sim.o_troops[a] = 100000
+	-- order it on A's coast if A has one, else at its start
+	local spot = sim.o_spawn_tile[a]
+	for _, t in sim:owned_tiles(a) do
+		if map:is_coastal(t) then
+			spot = t
+			break
+		end
+	end
+	expect(sim:station(a, spot, 0.5), "a station order on the coast goes through")
+	run(sim, Rules.GARRISON_FORM_TICKS + 1)
+	local g = sim.gar_of[a][1]
+	expect(not map:is_coastal(g.tile) or #sim:owned_tiles(a) < 30, "the garrison stands back from the shore")
+	expect(not sim:_landable(b, g.tile), "a boat can't land on a garrison's tile while it holds")
+	-- strikes and warheads reach garrisons even with nothing in reserve
+	sim.o_troops[a] = 0
+	local before = g.troops
+	sim:_nuke_troops(a, Defs.N_WARHEAD, 40, sim.o_tiles[a])
+	expect(g.troops < before, "warheads kill garrison troops with an empty reserve (" .. math.floor(before) .. " -> " .. math.floor(g.troops) .. ")")
+end
+
+-- an order near a garrison with nothing of the target's land in its reach goes from the reserve
+do
+	local sim, a, b = neighbours_match(41, 30)
+	sim:end_attacks_of(a)
+	sim.o_troops[a] = 50000
+	sim:station(a, sim.o_spawn_tile[a], 0.5)
+	run(sim, Rules.GARRISON_FORM_TICKS + 1)
+	local g = sim.gar_of[a][1]
+	local held = g.troops
+	-- water within reach: the garrison has nothing to launch into there
+	local water = -1
+	for _, t in sim:disk_tiles(g.tile, sim.R.garrison_range() * Rules.GARRISON_REACH, false) do
+		if buffer.readu8(sim.land, t) == 0 then
+			water = t
+			break
+		end
+	end
+	if water >= 0 then
+		expect(not sim:garrison_attack(a, water, 0.5) and g.troops == held, "no launch into water: the garrison keeps its troops")
+	else
+		expect(true, "(no water near this garrison: skipped)")
+	end
 end
 
 -- a nuke's blast wipes out the garrisons inside it

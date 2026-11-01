@@ -1567,7 +1567,14 @@ function Sim._economy_tick(self: any)
 		-- goes below 0 when garrisons hold more than the cap)
 		local gar = if gar_of ~= nil and gar_of[id] ~= nil then self:garrison_total(id) else 0.0
 		if gar > 0.0 then
-			o_troops[id] = math.max(0.0, o_troops[id] + troop_growth_applied(tkind, o_troops[id] + gar, cap, tdiff))
+			local g = troop_growth_applied(tkind, o_troops[id] + gar, cap, tdiff)
+			local r = o_troops[id] + g
+			if r < 0.0 then
+				-- (over the cap with the reserve spent: the garrisons shrink back to it too)
+				self:_scale_garrisons(id, math.max(0.0, gar + r) / gar)
+				r = 0.0
+			end
+			o_troops[id] = r
 		else
 			o_troops[id] += troop_growth_applied(tkind, o_troops[id], cap, tdiff)
 		end

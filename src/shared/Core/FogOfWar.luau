@@ -248,9 +248,16 @@ local function step_scan(self: any)
 end
 
 --- Whether the fog is on now (Rules.FOG_OF_WAR, a player, playing).
+--- Whether the fog is on now: Rules.FOG_OF_WAR, playing, and a player in the match (a nation alive that
+--- has landed). A player still choosing where to land (a late joiner) and one knocked out who keeps
+--- watching see everything, like a spectator.
 function FogOfWar.wanted(self: any): boolean
 	local st = self.state
-	return Rules.FOG_OF_WAR == true and st.local_owner ~= 0 and st.phase == Defs.PHASE_PLAYING and st.loaded ~= false
+	if Rules.FOG_OF_WAR ~= true or st.local_owner == 0 or st.phase ~= Defs.PHASE_PLAYING or st.loaded == false then
+		return false
+	end
+	local o = st.owners[st.local_owner]
+	return o ~= nil and o.alive == true and o.spawned == true
 end
 
 --- The side's ships at sea: { cell index }.
@@ -365,19 +372,29 @@ function FogOfWar.update(self: any, dt: number)
 	if self._scan ~= nil then
 		step_scan(self)
 	end
-	-- (on while the counts are this viewer's: an alliance's re-count keeps the old ones until it is done)
-	local want = self:wanted() and self.viewer == st.local_owner
+	-- (an alliance's re-count keeps the old counts in use until it is done; a new viewer's first count
+	-- shows nothing in sight until it is done: never the whole map for a few frames)
+	local want = self:wanted()
+	local counted = self.viewer == st.local_owner
 	if want ~= self.active then
 		self.active = want
-		if want then
+		if want and counted then
 			self:_recompute()
+		elseif want then
+			buffer.fill(self.vis, 0, 0)
+			self._dirty = true
 		end
-		self._dirty = false
+		if not (want and not counted) then
+			self._dirty = false
+		end
 		self._ship_t = 0.0
 		self._seen_t = -math.huge
 		self.version += 1
 		self.changed:Fire(nil)
 		return
+	end
+	if not counted then
+		return -- (the new viewer's count goes on: sight stays as it is)
 	end
 	if not self.active then
 		return

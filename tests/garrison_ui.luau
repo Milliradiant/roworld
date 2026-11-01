@@ -3,7 +3,13 @@
 -- radial items (Station / Reinforce / Disband), what Station and Disband send, an attack ordered near
 -- a garrison previewed as launched from it, troop displays counting garrisons, and tile_owner under
 -- the fog.
-require("./prelude")
+local roblox = require("./prelude")
+-- (UI/Banner, loaded on the way, makes a NumberSequence at load: the prelude doesn't expose it)
+for _, name in { "NumberSequence", "NumberSequenceKeypoint", "ColorSequence", "ColorSequenceKeypoint" } do
+	if (roblox :: any)[name] ~= nil then
+		(getfenv() :: any)[name] = (roblox :: any)[name]
+	end
+end
 local Defs = require("../src/shared/Core/Defs")
 local GameState = require("../src/shared/Core/GameState")
 local WorldMap = require("../src/shared/Core/WorldMap")
@@ -202,6 +208,11 @@ do
 		end,
 	}
 	expect(gs:tile_owner(theirs) == 0 and gs:true_owner(theirs) == ENEMY, "a tile out of sight reads as nobody's")
+	ctx.rules:invalidate()
+	local act = ctx.rules:primary(theirs)
+	expect(not act.ok and string.find(act.reason, "Out of sight", 1, true) ~= nil, "no order into land out of sight: " .. tostring(act.reason))
+	local boat = item(ctx.rules:radial_items(theirs), "boat")
+	expect(boat == nil or not boat.ok, "nor a boat")
 	expect(gs:tile_owner(home) == ME, "the player's own land as ever")
 	gs.fog = nil
 	expect(gs:tile_owner(theirs) == ENEMY, "without the fog, the real owner")

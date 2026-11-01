@@ -533,7 +533,11 @@ function UnitLayer.tick(self: any, _dt: number)
 				sx1, sy1 = cam:map_to_screen(ux, uy)
 			end
 			local half = math.abs(sx1 - sx0) + math.abs(sy1 - sy0)
-			if half > 0 and cam:on_screen((sx0 + sx1) * 0.5, (sy0 + sy1) * 0.5, half * 0.5 + wake_w) then
+			-- (under the fog only the stretch of wake in sight: not the hidden shore it came from)
+			local wake_seen = fog == nil
+				or not fog.active
+				or seen_uv(fog, FW, FH, if j < seg then xs[j + 1] else ux, if j < seg then ys[j + 1] else uy)
+			if wake_seen and half > 0 and cam:on_screen((sx0 + sx1) * 0.5, (sy0 + sy1) * 0.5, half * 0.5 + wake_w) then
 				self:_bar(sx0, sy0, sx1, sy1, wake_w, c)
 			end
 			sx0, sy0 = sx1, sy1
@@ -609,7 +613,7 @@ function UnitLayer.tick(self: any, _dt: number)
 		end
 		if NUKE_PLAIN[n.kind] then
 			local sx0, sy0 = cam:map_to_screen(UnitLayer.nuke_uv(st, n, t))
-			if cam:on_screen(sx0, sy0, npx) then
+			if cam:on_screen(sx0, sy0, npx) and seen_uv(fog, FW, FH, UnitLayer.nuke_uv(st, n, t)) then
 				self:_sprite(uid * 16 + KEY_NUKE, col, n.owner, sx0, sy0, npx, seen)
 			end
 			continue
@@ -625,22 +629,29 @@ function UnitLayer.tick(self: any, _dt: number)
 		local steps = math.clamp(math.floor(len * k / UnitLayer.TRAIL_STEP), 2, TrailBudget.MAX)
 		local thick = math.max(2, math.round(cam.scale * UnitLayer.TRAIL_WIDTH))
 		local x, y = cam:map_to_screen(UnitLayer.nuke_uv(st, n, t))
+		-- (under the fog: the munition itself only where it can be seen, though its target can be)
+		local cur_seen = seen_uv(fog, FW, FH, UnitLayer.nuke_uv(st, n, t))
 		-- (the newest `trail_dots` points: the whole trail unless many munitions fly at once)
 		local newest = math.floor(steps * t)
 		local px0, py0 = nil, nil
 		for i = math.max(0, newest - trail_dots + 1), newest + 1 do
 			local tx, ty
+			local trail_seen = true
 			if i > newest then
 				tx, ty = x, y
+				trail_seen = cur_seen
 			else
-				tx, ty = cam:map_to_screen(UnitLayer.nuke_uv(st, n, i / steps))
+				local tu, tv = UnitLayer.nuke_uv(st, n, i / steps)
+				tx, ty = cam:map_to_screen(tu, tv)
+				-- (under the fog only the trail in sight: not the hidden silo it came from)
+				trail_seen = seen_uv(fog, FW, FH, tu, tv)
 			end
-			if px0 ~= nil and (cam:on_screen(tx, ty, thick) or cam:on_screen(px0, py0, thick)) then
+			if px0 ~= nil and trail_seen and (cam:on_screen(tx, ty, thick) or cam:on_screen(px0, py0, thick)) then
 				self:_bar(px0, py0, tx, ty, thick, c)
 			end
 			px0, py0 = tx, ty
 		end
-		if cam:on_screen(x, y, npx) then
+		if cur_seen and cam:on_screen(x, y, npx) then
 			self:_sprite(uid * 16 + KEY_NUKE, col, n.owner, x, y, npx, seen)
 		end
 		if n.kind == Defs.N_WARHEAD and not rings_for_warheads then

@@ -183,8 +183,8 @@ function SimGarrisons.install(C: any)
 						continue
 					end
 					local n = y * W + x
-					if readu8(land, n) == 1 and readi32(owner, n * 4) ~= id then
-						return false
+					if readu8(land, n) == 0 or readi32(owner, n * 4) ~= id then
+						return false -- (another's land, free land, or water: the edge of the nation)
 					end
 				end
 			end
@@ -425,12 +425,31 @@ function SimGarrisons.install(C: any)
 			return false
 		end
 		local gg = g :: Garrison
-		-- the launch tile: own land within the garrison's range touching the target, nearest `t`
+		-- the launch tile: own land within the garrison's range next to the target's land (water is
+		-- nobody's too), nearest `t`
 		local owner = self.owner
+		local land = self.land
+		local W, N = self.W, self.N
+		local function touches_land_of(s: number): boolean
+			local x = s % W
+			if x > 0 and readu8(land, s - 1) == 1 and readi32(owner, (s - 1) * 4) == tg then
+				return true
+			end
+			if x < W - 1 and readu8(land, s + 1) == 1 and readi32(owner, (s + 1) * 4) == tg then
+				return true
+			end
+			if s >= W and readu8(land, s - W) == 1 and readi32(owner, (s - W) * 4) == tg then
+				return true
+			end
+			if s < N - W and readu8(land, s + W) == 1 and readi32(owner, (s + W) * 4) == tg then
+				return true
+			end
+			return false
+		end
 		local launch = -1
 		local ld = math.huge
 		for _, s in self:disk_tiles(gg.tile, range, true) do
-			if readi32(owner, s * 4) == id and touches(self, s, tg) then
+			if readi32(owner, s * 4) == id and touches_land_of(s) then
 				local d = range_d2(s, t)
 				if d < ld then
 					launch = s
@@ -447,12 +466,16 @@ function SimGarrisons.install(C: any)
 		end
 		gg.troops -= troops
 		self._gar_dirty = math.max(self._gar_dirty, 1)
-		self.dbg_flow[id * 5] += troops
+		local before = self.o_troops[id]
 		local a = self:start_attack(id, tg, troops, launch)
-		if a == nil then
-			-- (start_attack refunded the reserve, or the troops went into cancelling a counter-attack)
-			return true
+		if a == nil and self.o_troops[id] >= before + troops - 0.5 then
+			-- nothing to attack after all: start_attack refunded the reserve; the troops go back to
+			-- the garrison and the caller sends an ordinary attack (which says why)
+			self.o_troops[id] -= troops
+			gg.troops += troops
+			return false
 		end
+		self.dbg_flow[id * 5] += troops
 		return true
 	end
 

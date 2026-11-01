@@ -730,14 +730,25 @@ function SimNukes.install(C)
 		end
 		local k = self.R.K_AREA
 		local warhead_death = Rules.warhead_death
-		local had = o_troops[o]
-		for _ = 1, n_lost do
-			local d = math.min(k * warhead_death(o_troops[o], cap), math.max(0.0, o_troops[o] - 0.03 * cap))
-			dbg_flow[o * 5 + 3] += d
-			o_troops[o] -= d
-		end
-		if had >= 1.0 then
-			self:_scale_garrisons(o, o_troops[o] / had)
+		-- (the army at home: the reserve and its garrisons, SimGarrisons, lose the same share)
+		local gar = self:garrison_total(o)
+		if gar > 0.0 then
+			local had = o_troops[o] + gar
+			local left = had
+			for _ = 1, n_lost do
+				local d = math.min(k * warhead_death(left, cap), math.max(0.0, left - 0.03 * cap))
+				dbg_flow[o * 5 + 3] += d
+				left -= d
+			end
+			local keep = left / math.max(had, 1.0)
+			o_troops[o] *= keep
+			self:_scale_garrisons(o, keep)
+		else
+			for _ = 1, n_lost do
+				local d = math.min(k * warhead_death(o_troops[o], cap), math.max(0.0, o_troops[o] - 0.03 * cap))
+				dbg_flow[o * 5 + 3] += d
+				o_troops[o] -= d
+			end
 		end
 		for _, a in self.attacks do
 			if not a.dead and a.attacker == o then

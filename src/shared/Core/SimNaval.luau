@@ -237,6 +237,9 @@ function SimNaval.install(C)
 			return false
 		end
 		local tg = readi32(self.owner, t * 4)
+		if tg ~= 0 and self.gar_at ~= nil and self:garrison_holds(t) then
+			return false -- (a garrison's tile holds against a landing too: SimGarrisons)
+		end
 		return tg ~= id and not (tg ~= 0 and self:allied(id, tg))
 	end
 

@@ -428,6 +428,8 @@ function MapView.bind_state(self: any, state: any)
 				self._conns,
 				fog.changed:Connect(function(cells)
 					guard("fog", surface.on_fog_changed, surface, cells)
+					-- (hostile ranges are chosen again with what can be seen now)
+					call(self.layers.ranges, "mark_dirty")
 				end)
 			)
 			-- (counted now, from the state as it stands; tiles_changed keeps it current)
